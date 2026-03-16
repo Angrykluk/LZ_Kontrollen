@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lernkontrollen – Demo</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #15803d;
+      --danger: #b91c1c;
+      --warning: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    .subtitle { color: var(--muted); margin: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      background: #fff;
+    }
+    button {
+      border: none;
+      border-radius: 10px;
+      background: var(--primary);
+      color: white;
+      font: inherit;
+      font-weight: 700;
+      padding: 10px 16px;
+      cursor: pointer;
+    }
+    button:hover { background: var(--primary-dark); }
+    button.secondary { background: #e5e7eb; color: #111827; }
+    button.secondary:hover { background: #d1d5db; }
+    button.danger { background: var(--danger); }
+    button.danger:hover { background: #991b1b; }
+    .hidden { display: none !important; }
+    .badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .badge.success { background: #dcfce7; color: #166534; }
+    .badge.warning { background: #fef3c7; color: #92400e; }
+    .badge.danger { background: #fee2e2; color: #991b1b; }
+    .session-link {
+      word-break: break-all;
+      background: #f9fafb;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.95rem;
+    }
+    #qrcode {
+      min-height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+    }
+    .question {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 16px;
+      background: #fff;
+    }
+    .option {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 8px 0;
+      border-top: 1px solid #f3f4f6;
+    }
+    .option:first-of-type { border-top: none; }
+    .timer {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--warning);
+    }
+    .result-box {
+      padding: 16px;
+      border-radius: 14px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      margin-bottom: 16px;
+    }
+    .small { color: var(--muted); font-size: 0.92rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+    .teacher-login {
+      max-width: 420px;
+      margin: 80px auto;
+    }
+    .notice {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #9a3412;
+      margin-bottom: 12px;
+    }
+    .footer-note {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="teacherApp" class="hidden">
+      <div class="topbar">
+        <div>
+          <h1>Lernkontrollen – Lehrkraft</h1>
+          <p class="subtitle">Demo-Version für GitHub Pages mit Klassen, Tests, QR-Code und Zeitsperre.</p>
+        </div>
+        <div class="row">
+          <span id="globalLockBadge" class="badge warning">System offen</span>
+          <button id="toggleGlobalLockBtn" class="secondary">System sperren</button>
+          <button id="teacherLogoutBtn" class="secondary">Logout</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Test freigeben</h2>
+          <div class="row">
+            <div style="flex:1 1 220px;">
+              <label for="classSelect">Klasse</label>
+              <select id="classSelect"></select>
+            </div>
+            <div style="flex:1 1 220px;">
+              <label for="testSelect">Test</label>
+              <select id="testSelect"></select>
+            </div>
+          </div>
+          <div class="row">
+            <div style="flex:1 1 160px;">
+              <label for="durationInput">Zeit (Minuten)</label>
+              <input id="durationInput" type="text" value="15" />
+            </div>
+            <div style="flex:1 1 160px;">
+              <label for="sessionLabel">Freigabetitel</label>
+              <input id="sessionLabel" type="text" value="Lernkontrolle heute" />
+            </div>
+          </div>
+          <div class="row">
+            <button id="createSessionBtn">QR-Code erzeugen</button>
+            <button id="closeSessionBtn" class="danger">Aktive Freigabe schließen</button>
+          </div>
+          <div id="sessionStatus" class="small">Noch keine aktive Freigabe.</div>
+          <div id="teacherActiveInfo" class="notice hidden"></div>
+        </section>
+
+        <section class="card">
+          <h2>Schülerzugang</h2>
+          <div id="qrcode"></div>
+          <div id="sessionLinkBox" class="session-link">Noch kein Link erzeugt.</div>
+          <p class="small">Die URL enthält eine zufällige Sitzungs-ID. Nach dem Schließen der Freigabe ist der Link nicht mehr nutzbar.</p>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top:20px;">
+        <h2>Ergebnisse</h2>
+        <div id="resultsSummary" class="small">Noch keine Ergebnisse vorhanden.</div>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Klasse</th>
+                <th>Test</th>
+                <th>Name</th>
+                <th>Punkte</th>
+                <th>Quote</th>
+                <th>Abgegeben</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody"></tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button id="exportResultsBtn" class="secondary">Ergebnisse als JSON exportieren</button>
+          <button id="resetDemoBtn" class="danger">Demo-Daten zurücksetzen</button>
+        </div>
+      </section>
+
+      <p class="footer-note">
+        Hinweis: Diese Demo speichert Daten nur im Browser (localStorage). Für echte Einmal-Teilnahme über mehrere Geräte hinweg braucht es später einen kleinen externen Datenspeicher.
+      </p>
+    </div>
+
+    <div id="teacherLogin" class="teacher-login hidden card">
+      <h1>Lehrkraft-Login</h1>
+      <p class="subtitle">Demo-Passwort: <strong>lehrer123</strong></p>
+      <label for="teacherPassword">Passwort</label>
+      <input id="teacherPassword" type="password" placeholder="Passwort eingeben" />
+      <div class="row" style="margin-top:12px;">
+        <button id="teacherLoginBtn">Einloggen</button>
+      </div>
+    </div>
+
+    <div id="studentApp" class="hidden"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    const STORAGE_KEY = 'lernkontrollen_demo_v1';
+    const TEACHER_PASSWORD = 'lehrer123';
+
+    const defaultData = {
+      settings: {
+        globalLocked: false
+      },
+      classes: [
+        {
+          id: 'klasse-7a',
+          name: 'Klasse 7A',
+          students: ['Anna Becker','Ben Fischer','Clara Neumann','David Scholz','Ella Wagner','Felix Braun','Greta Hofmann','Hasan Yilmaz','Ida König','Jonas Richter']
+        }
+      ],
+      tests: [
+        {
+          id: 'test-demo-001',
+          title: 'Starttest Allgemeinwissen',
+          durationMinutes: 15,
+          questions: [
+            { text: 'Welche Zahl ist eine Primzahl?', options: ['12','15','21','29','35','39','49','51','57','63'], correct: [3] },
+            { text: 'Welcher Planet ist für seine Ringe bekannt?', options: ['Mars','Venus','Merkur','Neptun','Saturn','Erde','Jupiter','Uranus','Pluto','Sonne'], correct: [4] },
+            { text: 'Welches Wort ist ein Verb?', options: ['Haus','laufen','grün','Tisch','schnell','Wolke','Stift','leise','Sommer','Fenster'], correct: [1] },
+            { text: 'Wie viele Minuten hat eine Stunde?', options: ['10','20','30','40','50','60','70','80','90','100'], correct: [5] },
+            { text: 'Welche Farbe entsteht aus Blau und Gelb?', options: ['Rot','Lila','Orange','Grün','Schwarz','Weiß','Braun','Pink','Grau','Türkis'], correct: [3] },
+            { text: 'In welchem Kontinent liegt Ägypten?', options: ['Europa','Asien','Afrika','Südamerika','Nordamerika','Australien','Antarktika','Arktis','Ozeanien','Atlantis'], correct: [2] },
+            { text: 'Welches Tier ist ein Säugetier?', options: ['Hai','Amsel','Frosch','Delfin','Forelle','Eidechse','Biene','Krabbe','Tintenfisch','Schildkröte'], correct: [3] },
+            { text: 'Welche Einheit misst Gewicht?', options: ['Meter','Liter','Sekunde','Grad','Kilogramm','Watt','Volt','Pascal','Hertz','Byte'], correct: [4] },
+            { text: 'Welches Land hat Berlin als Hauptstadt?', options: ['Österreich','Schweiz','Niederlande','Deutschland','Belgien','Dänemark','Polen','Ungarn','Tschechien','Frankreich'], correct: [3] },
+            { text: 'Welche der folgenden Zahlen ist gerade?', options: ['11','13','15','17','19','21','23','24','27','29'], correct: [7] }
+          ]
+        }
+      ],
+      activeSession: null,
+      results: []
+    };
+
+    function loadState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return structuredClone(defaultData);
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return structuredClone(defaultData);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function structuredClone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    function shuffle(array) {
+      const copy = [...array];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function uid(length = 10) {
+      const chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let out = '';
+      for (let i = 0; i < length; i++) out += chars[Math.floor(Math.random() * chars.length)];
+      return out;
+    }
+
+    function getBaseUrl() {
+      return window.location.origin + window.location.pathname;
+    }
+
+    function getUrlParams() {
+      return new URLSearchParams(window.location.search);
+    }
+
+    function setTeacherMode() {
+      document.getElementById('teacherLogin').classList.add('hidden');
+      document.getElementById('studentApp').classList.add('hidden');
+      document.getElementById('teacherApp').classList.remove('hidden');
+      renderTeacher();
+    }
+
+    function setTeacherLoginMode() {
+      document.getElementById('teacherApp').classList.add('hidden');
+      document.getElementById('studentApp').classList.add('hidden');
+      document.getElementById('teacherLogin').classList.remove('hidden');
+    }
+
+    function setStudentMode() {
+      document.getElementById('teacherApp').classList.add('hidden');
+      document.getElementById('teacherLogin').classList.add('hidden');
+      document.getElementById('studentApp').classList.remove('hidden');
+      renderStudent();
+    }
+
+    function isTeacherRequested() {
+      const params = getUrlParams();
+      return params.get('mode') === 'teacher';
+    }
+
+    function getActiveClass() {
+      return state.classes.find(c => c.id === document.getElementById('classSelect').value) || state.classes[0];
+    }
+
+    function getActiveTest() {
+      return state.tests.find(t => t.id === document.getElementById('testSelect').value) || state.tests[0];
+    }
+
+    function populateSelectors() {
+      const classSelect = document.getElementById('classSelect');
+      const testSelect = document.getElementById('testSelect');
+      classSelect.innerHTML = state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      testSelect.innerHTML = state.tests.map(t => `<option value="${t.id}">${t.title}</option>`).join('');
+      if (state.activeSession) {
+        classSelect.value = state.activeSession.classId;
+        testSelect.value = state.activeSession.testId;
+        document.getElementById('durationInput').value = state.activeSession.durationMinutes;
+        document.getElementById('sessionLabel').value = state.activeSession.label;
+      } else {
+        document.getElementById('durationInput').value = state.tests[0]?.durationMinutes || 15;
+      }
+    }
+
+    function renderTeacher() {
+      populateSelectors();
+      const badge = document.getElementById('globalLockBadge');
+      const toggleBtn = document.getElementById('toggleGlobalLockBtn');
+      badge.textContent = state.settings.globalLocked ? 'System gesperrt' : 'System offen';
+      badge.className = `badge ${state.settings.globalLocked ? 'danger' : 'warning'}`;
+      toggleBtn.textContent = state.settings.globalLocked ? 'System entsperren' : 'System sperren';
+
+      const qrcodeBox = document.getElementById('qrcode');
+      const linkBox = document.getElementById('sessionLinkBox');
+      const status = document.getElementById('sessionStatus');
+      const info = document.getElementById('teacherActiveInfo');
+
+      qrcodeBox.innerHTML = '';
+      if (state.activeSession && state.activeSession.open) {
+        const sessionUrl = `${getBaseUrl()}?session=${encodeURIComponent(state.activeSession.sessionId)}`;
+        new QRCode(qrcodeBox, {
+          text: sessionUrl,
+          width: 200,
+          height: 200
+        });
+        linkBox.textContent = sessionUrl;
+        const className = state.classes.find(c => c.id === state.activeSession.classId)?.name || state.activeSession.classId;
+        const testName = state.tests.find(t => t.id === state.activeSession.testId)?.title || state.activeSession.testId;
+        status.textContent = 'Aktive Freigabe vorhanden.';
+        info.classList.remove('hidden');
+        info.textContent = `${state.activeSession.label}: ${className} · ${testName} · ${state.activeSession.durationMinutes} Minuten · Session-ID ${state.activeSession.sessionId}`;
+      } else {
+        linkBox.textContent = 'Noch kein Link erzeugt.';
+        status.textContent = 'Noch keine aktive Freigabe.';
+        info.classList.add('hidden');
+        info.textContent = '';
+        qrcodeBox.innerHTML = '<span class="small">Nach Erzeugung erscheint hier der QR-Code.</span>';
+      }
+      renderResults();
+    }
+
+    function renderResults() {
+      const tbody = document.getElementById('resultsTableBody');
+      const summary = document.getElementById('resultsSummary');
+      const rows = [...state.results].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="small">Noch keine Ergebnisse vorhanden.</td></tr>';
+        summary.textContent = 'Noch keine Ergebnisse vorhanden.';
+        return;
+      }
+      summary.textContent = `${rows.length} Ergebnis(se) gespeichert.`;
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.className)}</td>
+          <td>${escapeHtml(r.testTitle)}</td>
+          <td>${escapeHtml(r.studentName)}</td>
+          <td>${r.score} / ${r.total}</td>
+          <td>${Math.round((r.score / r.total) * 100)}%</td>
+          <td>${new Date(r.submittedAt).toLocaleString('de-DE')}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderStudent() {
+      const root = document.getElementById('studentApp');
+      const params = getUrlParams();
+      const sessionId = params.get('session');
+
+      if (state.settings.globalLocked) {
+        root.innerHTML = studentMessage('Zugriff gesperrt', 'Die Plattform wurde von der Lehrkraft gesperrt.');
+        return;
+      }
+      if (!sessionId || !state.activeSession || !state.activeSession.open || state.activeSession.sessionId !== sessionId) {
+        root.innerHTML = studentMessage('Kein aktiver Test', 'Dieser Link ist nicht aktiv oder die Freigabe wurde bereits geschlossen.');
+        return;
+      }
+
+      const session = state.activeSession;
+      const currentClass = state.classes.find(c => c.id === session.classId);
+      const currentTest = state.tests.find(t => t.id === session.testId);
+      if (!currentClass || !currentTest) {
+        root.innerHTML = studentMessage('Konfiguration fehlt', 'Die ausgewählte Klasse oder der Test wurde nicht gefunden.');
+        return;
+      }
+
+      const alreadyDoneNames = state.results
+        .filter(r => r.classId === session.classId && r.testId === session.testId)
+        .map(r => r.studentName);
+
+      const availableStudents = currentClass.students;
+      const options = availableStudents.map(name => {
+        const done = alreadyDoneNames.includes(name);
+        return `<option value="${escapeAttr(name)}" ${done ? 'disabled' : ''}>${escapeHtml(name)}${done ? ' (bereits durchgeführt)' : ''}</option>`;
+      }).join('');
+
+      root.innerHTML = `
+        <div class="card">
+          <div class="topbar">
+            <div>
+              <h1>${escapeHtml(currentTest.title)}</h1>
+              <p class="subtitle">${escapeHtml(currentClass.name)} · ${session.durationMinutes} Minuten</p>
+            </div>
+            <span class="badge success">Session aktiv</span>
+          </div>
+          <div class="notice">Fragen und Antwortreihenfolgen werden beim Start zufällig gemischt.</div>
+          <label for="studentNameSelect">Name auswählen</label>
+          <select id="studentNameSelect">
+            <option value="">Bitte Namen wählen</option>
+            ${options}
+          </select>
+          <div class="row" style="margin-top:12px;">
+            <button id="startTestBtn">Test starten</button>
+          </div>
+          <p class="small">Jeder Name kann diesen Test in dieser Demo nur einmal abgeben. In dieser rein statischen GitHub-Version gilt das nur für denselben gemeinsamen Speicherstand im Browser.</p>
+        </div>
+      `;
+
+      document.getElementById('startTestBtn').onclick = () => startStudentTest(session, currentClass, currentTest);
+    }
+
+    function startStudentTest(session, currentClass, currentTest) {
+      const name = document.getElementById('studentNameSelect').value;
+      if (!name) {
+        alert('Bitte zuerst einen Namen auswählen.');
+        return;
+      }
+      const exists = state.results.some(r => r.classId === session.classId && r.testId === session.testId && r.studentName === name);
+      if (exists) {
+        document.getElementById('studentApp').innerHTML = studentMessage('Bereits durchgeführt', `${name} hat diesen Test bereits bearbeitet.`);
+        return;
+      }
+
+      const randomizedQuestions = shuffle(currentTest.questions).map((q, idx) => {
+        const indexedOptions = q.options.map((text, i) => ({ text, originalIndex: i }));
+        const shuffledOptions = shuffle(indexedOptions);
+        return {
+          id: idx + 1,
+          text: q.text,
+          options: shuffledOptions,
+          correctOriginalIndices: q.correct
+        };
+      });
+
+      const startedAt = Date.now();
+      const durationMs = session.durationMinutes * 60 * 1000;
+      let timerHandle = null;
+
+      const root = document.getElementById('studentApp');
+      root.innerHTML = `
+        <div class="card">
+          <div class="topbar">
+            <div>
+              <h1>${escapeHtml(currentTest.title)}</h1>
+              <p class="subtitle">Name: ${escapeHtml(name)} · ${escapeHtml(currentClass.name)}</p>
+            </div>
+            <div class="timer" id="timerDisplay">${session.durationMinutes}:00</div>
+          </div>
+          <form id="testForm"></form>
+          <div class="row">
+            <button id="submitTestBtn" type="button">Abgeben</button>
+          </div>
+        </div>
+      `;
+
+      const form = document.getElementById('testForm');
+      form.innerHTML = randomizedQuestions.map((q, qi) => `
+        <div class="question">
+          <h3>Frage ${qi + 1}</h3>
+          <p>${escapeHtml(q.text)}</p>
+          ${q.options.map((opt, oi) => `
+            <label class="option">
+              <input type="checkbox" name="q_${qi}" value="${oi}" />
+              <span>${escapeHtml(opt.text)}</span>
+            </label>
+          `).join('')}
+        </div>
+      `).join('');
+
+      function updateTimer() {
+        const remaining = Math.max(0, durationMs - (Date.now() - startedAt));
+        const totalSeconds = Math.ceil(remaining / 1000);
+        const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+        const ss = String(totalSeconds % 60).padStart(2, '0');
+        const display = document.getElementById('timerDisplay');
+        if (display) display.textContent = `${mm}:${ss}`;
+        if (remaining <= 0) {
+          clearInterval(timerHandle);
+          submitTest(true);
+        }
+      }
+
+      function submitTest(auto = false) {
+        clearInterval(timerHandle);
+        const answers = randomizedQuestions.map((q, qi) => {
+          const checked = [...document.querySelectorAll(`input[name="q_${qi}"]:checked`)].map(el => Number(el.value));
+          const selectedOriginalIndices = checked.map(idx => q.options[idx].originalIndex).sort((a,b) => a-b);
+          const correct = [...q.correctOriginalIndices].sort((a,b) => a-b);
+          const isCorrect = JSON.stringify(selectedOriginalIndices) === JSON.stringify(correct);
+          return {
+            question: q.text,
+            selectedOriginalIndices,
+            correctOriginalIndices: correct,
+            isCorrect
+          };
+        });
+        const score = answers.filter(a => a.isCorrect).length;
+        const result = {
+          sessionId: session.sessionId,
+          classId: currentClass.id,
+          className: currentClass.name,
+          testId: currentTest.id,
+          testTitle: currentTest.title,
+          studentName: name,
+          score,
+          total: randomizedQuestions.length,
+          submittedAt: new Date().toISOString(),
+          autoSubmitted: auto,
+          answers
+        };
+        state.results.push(result);
+        saveState();
+
+        const detailList = answers.map((a, i) => `<li>Frage ${i+1}: ${a.isCorrect ? 'richtig' : 'falsch'}</li>`).join('');
+        document.getElementById('studentApp').innerHTML = `
+          <div class="card">
+            <h1>Ergebnis</h1>
+            <div class="result-box">
+              <p><strong>${escapeHtml(name)}</strong>, du hast <strong>${score} von ${randomizedQuestions.length}</strong> Punkten erreicht.</p>
+              <p>Quote: <strong>${Math.round((score / randomizedQuestions.length) * 100)}%</strong></p>
+              <p>${auto ? 'Der Test wurde wegen Zeitablauf automatisch abgegeben.' : 'Der Test wurde erfolgreich abgegeben.'}</p>
+            </div>
+            <h3>Auswertung</h3>
+            <ol>${detailList}</ol>
+          </div>
+        `;
+      }
+
+      document.getElementById('submitTestBtn').onclick = () => submitTest(false);
+      timerHandle = setInterval(updateTimer, 250);
+      updateTimer();
+    }
+
+    function studentMessage(title, text) {
+      return `
+        <div class="card">
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(text)}</p>
+        </div>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function createSession() {
+      const cls = getActiveClass();
+      const test = getActiveTest();
+      const duration = Number(document.getElementById('durationInput').value) || test.durationMinutes || 15;
+      const label = document.getElementById('sessionLabel').value.trim() || 'Freigabe';
+      state.activeSession = {
+        sessionId: uid(12),
+        classId: cls.id,
+        testId: test.id,
+        durationMinutes: duration,
+        label,
+        open: true,
+        createdAt: new Date().toISOString()
+      };
+      saveState();
+      renderTeacher();
+    }
+
+    function closeSession() {
+      if (state.activeSession) {
+        state.activeSession.open = false;
+        saveState();
+      }
+      renderTeacher();
+    }
+
+    function exportResults() {
+      const blob = new Blob([JSON.stringify(state.results, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'lernkontrollen-ergebnisse.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function resetDemo() {
+      if (!confirm('Alle Demo-Daten wirklich löschen?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      state = loadState();
+      route();
+    }
+
+    let state = loadState();
+
+    function route() {
+      state = loadState();
+      if (isTeacherRequested()) {
+        setTeacherLoginMode();
+      } else {
+        setStudentMode();
+      }
+    }
+
+    document.addEventListener('click', (event) => {
+      const id = event.target.id;
+      if (id === 'teacherLoginBtn') {
+        const pw = document.getElementById('teacherPassword').value;
+        if (pw === TEACHER_PASSWORD) {
+          setTeacherMode();
+        } else {
+          alert('Falsches Passwort.');
+        }
+      }
+      if (id === 'teacherLogoutBtn') {
+        setTeacherLoginMode();
+        document.getElementById('teacherPassword').value = '';
+      }
+      if (id === 'toggleGlobalLockBtn') {
+        state.settings.globalLocked = !state.settings.globalLocked;
+        saveState();
+        renderTeacher();
+      }
+      if (id === 'createSessionBtn') createSession();
+      if (id === 'closeSessionBtn') closeSession();
+      if (id === 'exportResultsBtn') exportResults();
+      if (id === 'resetDemoBtn') resetDemo();
+    });
+
+    route();
+  </script>
+</body>
+</html>
