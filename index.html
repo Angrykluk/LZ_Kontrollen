@@ -202,17 +202,24 @@
       <h1>Lernkontrollen</h1>
       <p class="subtitle">Die Anwendung wird geladen ...</p>
     </div>
+<div id="teacherLogin" class="teacher-login hidden card">
+  <h1>Lehrkraft-Login</h1>
+  <p class="subtitle">Anmeldung über Supabase Auth</p>
 
-    <div id="teacherLogin" class="teacher-login hidden card">
-      <h1>Lehrkraft-Login</h1>
-      <p class="subtitle">Für diese Zwischenversion wird noch ein einfaches Demo-Passwort im Frontend verwendet.</p>
-      <div class="notice">Passwort für den Start: <strong>lehrer123</strong></div>
-      <label for="teacherPassword">Passwort</label>
-      <input id="teacherPassword" type="password" placeholder="Passwort eingeben" />
-      <div class="row" style="margin-top:12px;">
-        <button id="teacherLoginBtn">Einloggen</button>
-      </div>
-    </div>
+  <label for="teacherEmail">E-Mail</label>
+  <input id="teacherEmail" type="text" placeholder="name@schule.de" />
+
+  <label for="teacherPassword" style="margin-top:12px;">Passwort</label>
+  <input id="teacherPassword" type="password" placeholder="Passwort eingeben" />
+
+  <div class="row" style="margin-top:12px;">
+    <button id="teacherLoginBtn">Einloggen</button>
+  </div>
+
+  <div id="teacherLoginMessage" class="small"></div>
+</div>
+
+
 
     <div id="teacherApp" class="hidden">
       <div class="topbar">
@@ -304,12 +311,37 @@
     // -----------------------------------------------------------------
     const SUPABASE_URL = 'https://coefkjaznubmytkjtymn.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvZWZramF6bnVibXl0a2p0eW1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMzQsImV4cCI6MjA5MDczMzIzNH0.PG7SBMz02PiqaUw6kjMz0uB1Y3KpcvHqFkvVToGNiak';
+<script>
+  async function loginTeacher() {
+    const email = document.getElementById('teacherEmail').value.trim();
+    const password = document.getElementById('teacherPassword').value;
+    const messageBox = document.getElementById('teacherLoginMessage');
 
-    // -----------------------------------------------------------------
-    // 2) DEMO-PASSWORT FÜR LEHRKRAFT-ANSICHT
-    //    NUR FÜR DIESE ZWISCHENVERSION
-    // -----------------------------------------------------------------
-    const TEACHER_PASSWORD = 'lehrer123';
+    messageBox.textContent = '';
+
+    if (!email || !password) {
+      messageBox.textContent = 'Bitte E-Mail und Passwort eingeben.';
+      return;
+    }
+
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      messageBox.textContent = 'Login fehlgeschlagen: ' + error.message;
+      return;
+    }
+
+    await renderTeacherApp();
+  }
+
+  async function logoutTeacher() {
+    await supabaseClient.auth.signOut();
+    showTeacherLogin();
+  }
+</script>
 
     const loadingApp = document.getElementById('loadingApp');
     const teacherLogin = document.getElementById('teacherLogin');
@@ -318,7 +350,7 @@
 
     let supabaseClient = null;
     let currentActiveSession = null;
-    let teacherLoggedIn = false;
+   
     let studentTestRuntime = null;
 
     function escapeHtml(value) {
@@ -406,7 +438,56 @@
     function initSupabase() {
       if (!validateSupabaseConfig()) return false;
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+      supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (isTeacherRequested()) {
+          if (session) {
+            await renderTeacherApp();
+          } else {
+            showTeacherLogin();
+          }
+        }
+      });
+    
       return true;
+    }
+    async function loginTeacher() {
+      const email = document.getElementById('teacherEmail').value.trim();
+      const password = document.getElementById('teacherPassword').value;
+      const messageBox = document.getElementById('teacherLoginMessage');
+    
+      messageBox.textContent = '';
+    
+      if (!email || !password) {
+        messageBox.textContent = 'Bitte E-Mail und Passwort eingeben.';
+        return;
+      }
+    
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+    
+      if (error) {
+        messageBox.textContent = 'Login fehlgeschlagen: ' + error.message;
+        return;
+      }
+    
+      await renderTeacherApp();
+    }
+    
+    async function logoutTeacher() {
+      await supabaseClient.auth.signOut();
+      showTeacherLogin();
+    }
+    
+    async function hasTeacherSession() {
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) {
+        console.error(error);
+        return false;
+      }
+      return !!data.session;
     }
 
     async function testSupabaseConnection() {
@@ -1049,14 +1130,14 @@
       }
 
       if (isTeacherRequested()) {
-        if (teacherLoggedIn) {
+        const loggedIn = await hasTeacherSession();
+        if (loggedIn) {
           await renderTeacherApp();
         } else {
           showTeacherLogin();
         }
         return;
       }
-
       const sessionCode = getUrlParams().get('session');
       if (!sessionCode) {
         showStudentMessage('Kein aktiver Test', 'Dieser Link enthält keine Session-ID. Nutze den QR-Code oder den Session-Link der Lehrkraft.', 'error');
@@ -1068,31 +1149,23 @@
 
     document.addEventListener('click', async (event) => {
       const id = event.target.id;
-
+    
       if (id === 'teacherLoginBtn') {
-        const password = document.getElementById('teacherPassword').value;
-        if (password === TEACHER_PASSWORD) {
-          teacherLoggedIn = true;
-          await renderTeacherApp();
-        } else {
-          alert('Falsches Passwort.');
-        }
+        await loginTeacher();
       }
-
+    
       if (id === 'teacherLogoutBtn') {
-        teacherLoggedIn = false;
-        document.getElementById('teacherPassword').value = '';
-        showTeacherLogin();
+        await logoutTeacher();
       }
-
+    
       if (id === 'createSessionBtn') {
         await createSession();
       }
-
+    
       if (id === 'closeSessionBtn') {
         await closeActiveSession();
       }
-
+    
       if (id === 'refreshResultsBtn') {
         await renderTeacherResults();
       }
