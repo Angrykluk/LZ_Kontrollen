@@ -1,26 +1,88 @@
 export const SUPABASE_URL = 'https://coefkjaznubmytkjtymn.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvZWZramF6bnVibXl0a2p0eW1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMzQsImV4cCI6MjA5MDczMzIzNH0.PG7SBMz02PiqaUw6kjMz0uB1Y3KpcvHqFkvVToGNiak';
+export const SUPABASE_ANON_KEY = 'DEIN_ANON_KEY';
 
 let supabaseClient = null;
 
+function createMemoryStorage() {
+  const store = new Map();
+
+  return {
+    getItem(key) {
+      return store.has(key) ? store.get(key) : null;
+    },
+    setItem(key, value) {
+      store.set(key, String(value));
+    },
+    removeItem(key) {
+      store.delete(key);
+    }
+  };
+}
+
+function getSafeStorage() {
+  if (typeof window === 'undefined') {
+    return createMemoryStorage();
+  }
+
+  try {
+    const testKey = '__lk_storage_test__';
+    window.localStorage.setItem(testKey, '1');
+    window.localStorage.removeItem(testKey);
+    return window.localStorage;
+  } catch (error) {
+    console.warn('Local Storage nicht verfügbar, weiche auf Memory Storage aus.', error);
+    return createMemoryStorage();
+  }
+}
+
 export function validateSupabaseConfig() {
   return !SUPABASE_URL.startsWith('HIER_') && !SUPABASE_ANON_KEY.startsWith('HIER_');
+}
+
+function buildSupabaseOptions() {
+  return {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'lernkontrollen-auth-v1',
+      storage: getSafeStorage()
+    }
+  };
 }
 
 export function getSupabaseClient() {
   if (!validateSupabaseConfig()) {
     throw new Error('Bitte zuerst Supabase-URL und Public Key eintragen.');
   }
-  if (!supabaseClient) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  if (!window.supabase || !window.supabase.createClient) {
+    throw new Error('Die Supabase-Bibliothek wurde nicht geladen.');
   }
+
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
+      buildSupabaseOptions()
+    );
+  }
+
   return supabaseClient;
 }
-export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'lernkontrollen-auth'
+
+export async function refreshSupabaseSessionIfPossible() {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+
+  if (data?.session) {
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) throw refreshError;
   }
-});
+}
+
+export function resetSupabaseClient() {
+  supabaseClient = null;
+}
