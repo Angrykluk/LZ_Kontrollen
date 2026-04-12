@@ -2,7 +2,6 @@ import { validateSupabaseConfig } from './config.js';
 import { typesetMath } from './math.js';
 import { escapeHtml, getUrlParams, shuffle } from './utils.js';
 import {
-  testSupabaseConnection,
   loadSessionByAccessCode,
   loadClassById,
   loadTestById,
@@ -15,6 +14,7 @@ import {
 
 const loadingApp = document.getElementById('loadingApp');
 const studentApp = document.getElementById('studentApp');
+
 let studentTestRuntime = null;
 
 function hideAllViews() {
@@ -34,7 +34,11 @@ function showLoading(message = 'Die Anwendung wird geladen ...') {
 }
 
 async function showStudentMessage(title, text, type = 'info') {
-  const boxClass = type === 'error' ? 'error-box' : type === 'success' ? 'success-box' : 'info';
+  const boxClass =
+    type === 'error' ? 'error-box' :
+    type === 'success' ? 'success-box' :
+    'info';
+
   showStudentApp();
   studentApp.innerHTML = `
     <div class="card">
@@ -45,17 +49,75 @@ async function showStudentMessage(title, text, type = 'info') {
   await typesetMath(studentApp);
 }
 
+function ensureConnectionBanner() {
+  let banner = document.getElementById('connectionBanner');
+
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'connectionBanner';
+    banner.className = 'hidden';
+    banner.style.position = 'fixed';
+    banner.style.left = '50%';
+    banner.style.bottom = '20px';
+    banner.style.transform = 'translateX(-50%)';
+    banner.style.zIndex = '9999';
+    banner.style.maxWidth = '90vw';
+    banner.style.padding = '10px 14px';
+    banner.style.borderRadius = '12px';
+    banner.style.border = '1px solid #fca5a5';
+    banner.style.background = '#fef2f2';
+    banner.style.color = '#991b1b';
+    banner.style.boxShadow = '0 8px 28px rgba(15, 23, 42, 0.15)';
+    document.body.appendChild(banner);
+  }
+
+  return banner;
+}
+
+function showConnectionBanner(message) {
+  const banner = ensureConnectionBanner();
+  banner.textContent = message;
+  banner.classList.remove('hidden');
+}
+
+function hideConnectionBanner() {
+  const banner = document.getElementById('connectionBanner');
+  if (banner) banner.classList.add('hidden');
+}
+
+function setInlineSubmitError(message = '') {
+  const box = document.getElementById('submitErrorBox');
+  if (!box) return;
+
+  if (!message) {
+    box.className = 'hidden';
+    box.textContent = '';
+    return;
+  }
+
+  box.className = 'error-box';
+  box.textContent = message;
+}
+
 async function renderStudentEntry(sessionCode) {
   try {
     const session = await loadSessionByAccessCode(sessionCode);
     if (!session) {
-      await showStudentMessage('Kein aktiver Test', 'Dieser Link ist nicht aktiv oder die Freigabe wurde bereits geschlossen.', 'error');
+      await showStudentMessage(
+        'Kein aktiver Test',
+        'Dieser Link ist nicht aktiv oder die Freigabe wurde bereits geschlossen.',
+        'error'
+      );
       return;
     }
 
     const now = new Date();
     if (session.ends_at && new Date(session.ends_at) < now) {
-      await showStudentMessage('Test beendet', 'Die Bearbeitungszeit dieser Session ist bereits abgelaufen.', 'error');
+      await showStudentMessage(
+        'Test beendet',
+        'Die Bearbeitungszeit dieser Session ist bereits abgelaufen.',
+        'error'
+      );
       return;
     }
 
@@ -68,7 +130,11 @@ async function renderStudentEntry(sessionCode) {
 
     const options = students.map(student => {
       const done = submittedIds.includes(student.id);
-      return `<option value="${student.id}" ${done ? 'disabled' : ''}>${escapeHtml(student.full_name)}${done ? ' (bereits durchgeführt)' : ''}</option>`;
+      return `
+        <option value="${student.id}" ${done ? 'disabled' : ''}>
+          ${escapeHtml(student.full_name)}${done ? ' (bereits durchgeführt)' : ''}
+        </option>
+      `;
     }).join('');
 
     showStudentApp();
@@ -81,15 +147,19 @@ async function renderStudentEntry(sessionCode) {
           </div>
           <span class="badge success">Session aktiv</span>
         </div>
+
         <div class="notice">Fragen und Antwortreihenfolgen werden beim Start zufällig gemischt.</div>
+
         <label for="studentNameSelect">Name auswählen</label>
         <select id="studentNameSelect">
           <option value="">Bitte Namen wählen</option>
           ${options}
         </select>
+
         <div class="row" style="margin-top:12px;">
           <button id="startTestBtn">Test starten</button>
         </div>
+
         <p class="small">Ein Name kann diese Session nur einmal abgeben.</p>
       </div>
     `;
@@ -97,29 +167,50 @@ async function renderStudentEntry(sessionCode) {
 
     document.getElementById('startTestBtn').onclick = async () => {
       const studentId = document.getElementById('studentNameSelect').value;
+
       if (!studentId) {
         alert('Bitte zuerst einen Namen auswählen.');
         return;
       }
+
       const selectedStudent = students.find(s => s.id === studentId);
-      const alreadyDone = await studentAlreadySubmitted(session.id, studentId);
-      if (alreadyDone) {
-        await showStudentMessage('Bereits durchgeführt', `${selectedStudent.full_name} hat diesen Test bereits bearbeitet.`, 'error');
+      if (!selectedStudent) {
+        alert('Der ausgewählte Name konnte nicht gefunden werden.');
         return;
       }
+
+      const alreadyDone = await studentAlreadySubmitted(session.id, studentId);
+      if (alreadyDone) {
+        await showStudentMessage(
+          'Bereits durchgeführt',
+          `${selectedStudent.full_name} hat diesen Test bereits bearbeitet.`,
+          'error'
+        );
+        return;
+      }
+
       await startStudentTest({ session, cls, test, student: selectedStudent });
     };
   } catch (error) {
     console.error(error);
-    await showStudentMessage('Fehler', 'Die Session konnte nicht geladen werden: ' + error.message, 'error');
+    await showStudentMessage(
+      'Fehler',
+      'Die Session konnte nicht geladen werden: ' + error.message,
+      'error'
+    );
   }
 }
 
 async function startStudentTest({ session, cls, test, student }) {
   try {
     const rawQuestions = await loadQuestionsForTest(test.id);
+
     if (!rawQuestions.length) {
-      await showStudentMessage('Keine Fragen gefunden', 'Für diesen Test wurden noch keine Fragen hinterlegt.', 'error');
+      await showStudentMessage(
+        'Keine Fragen gefunden',
+        'Für diesen Test wurden noch keine Fragen hinterlegt.',
+        'error'
+      );
       return;
     }
 
@@ -129,17 +220,20 @@ async function startStudentTest({ session, cls, test, student }) {
         text: opt.option_text,
         is_correct: !!opt.is_correct
       }));
+
       return {
         id: q.id,
         order: qIndex + 1,
         text: q.question_text,
-        max_points: q.max_points || 1,
+        max_points: Number(q.max_points || 1),
         options: shuffledOptions
       };
     });
 
-    const startTime = Date.now();
-    const endTime = session.ends_at ? new Date(session.ends_at).getTime() : (startTime + (test.duration_minutes || 15) * 60000);
+    const endTime = session.ends_at
+      ? new Date(session.ends_at).getTime()
+      : (Date.now() + (test.duration_minutes || 15) * 60000);
+
     let submitted = false;
 
     if (studentTestRuntime?.timerHandle) {
@@ -156,7 +250,11 @@ async function startStudentTest({ session, cls, test, student }) {
           </div>
           <div class="timer" id="timerDisplay">--:--</div>
         </div>
+
+        <div id="submitErrorBox" class="hidden"></div>
+
         <form id="testForm"></form>
+
         <div class="row">
           <button id="submitTestBtn" type="button">Abgeben</button>
         </div>
@@ -181,44 +279,59 @@ async function startStudentTest({ session, cls, test, student }) {
 
     async function submitTest(autoSubmitted = false) {
       if (submitted) return;
+
       submitted = true;
       clearInterval(studentTestRuntime?.timerHandle);
-    
+      setInlineSubmitError('');
+
+      const submitBtn = document.getElementById('submitTestBtn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = autoSubmitted ? 'Automatische Abgabe ...' : 'Speichere Abgabe ...';
+      }
+
       const doubleCheck = await studentAlreadySubmitted(session.id, student.id);
       if (doubleCheck) {
-        await showStudentMessage('Bereits durchgeführt', `${student.full_name} hat diesen Test bereits bearbeitet.`, 'error');
+        await showStudentMessage(
+          'Bereits durchgeführt',
+          `${student.full_name} hat diesen Test bereits bearbeitet.`,
+          'error'
+        );
         return;
       }
-    
+
       const answerPayload = [];
       let score = 0;
       let maxScore = 0;
-    
+
       randomizedQuestions.forEach((question, qi) => {
         const selectedIndices = [...document.querySelectorAll(`input[name="q_${qi}"]:checked`)]
           .map(input => Number(input.value));
+
         const selectedOptions = selectedIndices.map(index => question.options[index]);
         const selectedOptionIds = selectedOptions.map(opt => opt.id);
-    
+
         const totalCorrect = question.options.filter(opt => opt.is_correct).length;
         const correctSelected = selectedOptions.filter(opt => opt.is_correct).length;
         const wrongSelected = selectedOptions.filter(opt => !opt.is_correct).length;
-    
-        const rawFraction = (correctSelected - wrongSelected) / totalCorrect;
+
+        const rawFraction = totalCorrect > 0
+          ? (correctSelected - wrongSelected) / totalCorrect
+          : 0;
+
         const fraction = Math.max(0, Math.min(1, rawFraction));
         const awardedPoints = Number((fraction * (question.max_points || 1)).toFixed(2));
-    
+
         score += awardedPoints;
         maxScore += (question.max_points || 1);
-    
+
         answerPayload.push({
           question_id: question.id,
           selected_option_ids: selectedOptionIds,
-          awarded_points: awardedPoints,
-          selected_indices: selectedIndices
+          awarded_points: awardedPoints
         });
       });
-    
+
       try {
         await saveSubmissionWithAnswers({
           session,
@@ -227,20 +340,20 @@ async function startStudentTest({ session, cls, test, student }) {
           score: Number(score.toFixed(2)),
           maxScore: Number(maxScore.toFixed(2))
         });
-    
+
         const reviewHtml = randomizedQuestions.map((question, qi) => {
           const answer = answerPayload.find(a => a.question_id === question.id);
           const selectedIds = new Set(answer?.selected_option_ids || []);
-    
+
           const optionsHtml = question.options.map((opt) => {
             const wasSelected = selectedIds.has(opt.id);
             const isCorrect = !!opt.is_correct;
-    
+
             let badges = '';
             if (wasSelected) badges += '<span class="badge warning">Gewählt</span> ';
             if (isCorrect) badges += '<span class="badge success">Richtig</span>';
             if (wasSelected && !isCorrect) badges += '<span class="badge danger">Falsch gewählt</span>';
-    
+
             return `
               <div class="review-option ${isCorrect ? 'review-correct' : ''} ${wasSelected ? 'review-selected' : ''}">
                 <div>
@@ -250,7 +363,7 @@ async function startStudentTest({ session, cls, test, student }) {
               </div>
             `;
           }).join('');
-    
+
           return `
             <div class="question">
               <h3>Frage ${qi + 1}</h3>
@@ -262,24 +375,25 @@ async function startStudentTest({ session, cls, test, student }) {
             </div>
           `;
         }).join('');
-    
+
         showStudentApp();
         studentApp.innerHTML = `
           <div class="card">
             <h1>Ergebnis</h1>
+
             <div class="result-box">
               <p><strong>${escapeHtml(student.full_name)}</strong>, du hast <strong>${score.toFixed(2)} von ${maxScore.toFixed(2)}</strong> Punkten erreicht.</p>
               <p>Quote: <strong>${Math.round((score / maxScore) * 100)}%</strong></p>
               <p>${autoSubmitted ? 'Der Test wurde wegen Zeitablauf automatisch abgegeben.' : 'Der Test wurde erfolgreich abgegeben.'}</p>
             </div>
-    
+
             <div class="info">
               <strong>Legende:</strong><br>
               <span class="badge warning">Gewählt</span>
               <span class="badge success">Richtig</span>
               <span class="badge danger">Falsch gewählt</span>
             </div>
-    
+
             <h3>Auswertung im Detail</h3>
             ${reviewHtml}
           </div>
@@ -287,7 +401,19 @@ async function startStudentTest({ session, cls, test, student }) {
         await typesetMath(studentApp);
       } catch (error) {
         console.error(error);
-        await showStudentMessage('Fehler beim Speichern', 'Die Abgabe konnte nicht gespeichert werden: ' + error.message, 'error');
+
+        submitted = false;
+
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Erneut speichern';
+        }
+
+        setInlineSubmitError(
+          'Die Abgabe konnte nicht gespeichert werden: ' +
+          error.message +
+          ' Bitte prüfe die Verbindung und versuche es erneut.'
+        );
       }
     }
 
@@ -296,20 +422,29 @@ async function startStudentTest({ session, cls, test, student }) {
       const totalSeconds = Math.ceil(remaining / 1000);
       const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
       const ss = String(totalSeconds % 60).padStart(2, '0');
+
       const timerDisplay = document.getElementById('timerDisplay');
-      if (timerDisplay) timerDisplay.textContent = `${mm}:${ss}`;
+      if (timerDisplay) {
+        timerDisplay.textContent = `${mm}:${ss}`;
+      }
+
       if (remaining <= 0) {
         submitTest(true);
       }
     }
 
     document.getElementById('submitTestBtn').onclick = () => submitTest(false);
+
     const timerHandle = setInterval(updateTimer, 250);
     studentTestRuntime = { timerHandle };
     updateTimer();
   } catch (error) {
     console.error(error);
-    await showStudentMessage('Fehler', 'Der Test konnte nicht gestartet werden: ' + error.message, 'error');
+    await showStudentMessage(
+      'Fehler',
+      'Der Test konnte nicht gestartet werden: ' + error.message,
+      'error'
+    );
   }
 }
 
@@ -323,11 +458,23 @@ async function route() {
 
   const sessionCode = getUrlParams().get('session');
   if (!sessionCode) {
-    await showStudentMessage('Kein aktiver Test', 'Dieser Link enthält keine Session-ID. Nutze den QR-Code oder den Session-Link der Lehrkraft.', 'error');
+    await showStudentMessage(
+      'Kein aktiver Test',
+      'Dieser Link enthält keine Session-ID. Nutze den QR-Code oder den Session-Link der Lehrkraft.',
+      'error'
+    );
     return;
   }
 
   await renderStudentEntry(sessionCode);
 }
+
+window.addEventListener('offline', () => {
+  showConnectionBanner('Keine Netzwerkverbindung. Änderungen können gerade eventuell nicht gespeichert werden.');
+});
+
+window.addEventListener('online', () => {
+  hideConnectionBanner();
+});
 
 route();
