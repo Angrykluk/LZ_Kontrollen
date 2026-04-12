@@ -6,7 +6,6 @@ import {
   loginTeacher,
   logoutTeacher,
   onTeacherAuthChange,
-  testSupabaseConnection,
   loadClasses,
   loadTests,
   loadOpenSession,
@@ -23,12 +22,14 @@ import {
 const loadingApp = document.getElementById('loadingApp');
 const teacherLoginView = document.getElementById('teacherLogin');
 const teacherApp = document.getElementById('teacherApp');
+const teacherStatusBox = document.getElementById('teacherStatusBox');
 
 const state = {
   activeSession: null,
   tests: [],
   results: [],
-  selectedSubmissionId: null
+  selectedSubmissionId: null,
+  renderRun: 0
 };
 
 function hideAllViews() {
@@ -51,6 +52,40 @@ function showTeacherLogin() {
 function showTeacherApp() {
   hideAllViews();
   teacherApp.classList.remove('hidden');
+}
+
+function setTeacherStatus(type, message) {
+  if (!teacherStatusBox) return;
+
+  teacherStatusBox.className =
+    type === 'success' ? 'success-box' :
+    type === 'error' ? 'error-box' :
+    'info';
+
+  teacherStatusBox.textContent = message;
+}
+
+function clearTeacherLoginFields() {
+  const emailInput = document.getElementById('teacherEmail');
+  const passwordInput = document.getElementById('teacherPassword');
+  const messageBox = document.getElementById('teacherLoginMessage');
+
+  if (emailInput) emailInput.value = '';
+  if (passwordInput) passwordInput.value = '';
+  if (messageBox) messageBox.textContent = '';
+}
+
+async function tryRefreshExistingSession() {
+  try {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase.auth.getSession();
+
+    if (data?.session) {
+      await supabase.auth.refreshSession();
+    }
+  } catch (error) {
+    console.warn('Session-Refresh fehlgeschlagen:', error);
+  }
 }
 
 async function populateTeacherSelectors() {
@@ -79,16 +114,20 @@ async function populateTeacherSelectors() {
 
   testSelect.onchange = () => {
     const selected = state.tests.find(t => t.id === testSelect.value);
-    if (selected) document.getElementById('durationInput').value = selected.duration_minutes || 15;
+    if (selected) {
+      document.getElementById('durationInput').value = selected.duration_minutes || 15;
+    }
   };
 }
 
 async function renderTeacherActiveSession() {
   const active = await loadOpenSession();
   state.activeSession = active;
+
   const infoBox = document.getElementById('activeSessionInfo');
   const linkBox = document.getElementById('sessionLinkBox');
   const qrcodeBox = document.getElementById('qrcode');
+
   qrcodeBox.innerHTML = '';
 
   if (!active) {
@@ -104,6 +143,7 @@ async function renderTeacherActiveSession() {
   ]);
 
   const sessionUrl = buildStudentUrl(active.access_code);
+
   infoBox.innerHTML = `
     <div class="success-box">
       <strong>${escapeHtml(active.title)}</strong><br>
@@ -111,12 +151,18 @@ async function renderTeacherActiveSession() {
       Code: <strong>${escapeHtml(active.access_code)}</strong>
     </div>
   `;
+
   linkBox.textContent = sessionUrl;
-  new QRCode(qrcodeBox, { text: sessionUrl, width: 200, height: 200 });
+  new QRCode(qrcodeBox, {
+    text: sessionUrl,
+    width: 200,
+    height: 200
+  });
 }
 
 function renderResultDetailEmpty(message = 'Wähle in der Tabelle einen Eintrag aus, um die Detailauswertung zu sehen.') {
   const panel = document.getElementById('resultDetailPanel');
+  if (!panel) return;
   panel.innerHTML = `<div class="result-detail-empty">${escapeHtml(message)}</div>`;
 }
 
@@ -135,6 +181,7 @@ async function renderResultsOverview() {
   }
 
   summary.textContent = `${rows.length} Ergebnis(se) gespeichert. Klicke auf „Ansehen“, um Fragen und Antworten zu prüfen.`;
+
   tbody.innerHTML = rows.map(r => `
     <tr data-submission-id="${r.id}">
       <td>${escapeHtml(r.class_name)}</td>
@@ -163,52 +210,65 @@ async function renderResultsOverview() {
 
 async function renderResultDetail(submissionId) {
   state.selectedSubmissionId = submissionId;
+
   const panel = document.getElementById('resultDetailPanel');
+  if (!panel) return;
+
   panel.innerHTML = '<div class="small">Detailauswertung wird geladen ...</div>';
 
-  const detail = await loadSubmissionDetail(submissionId);
-  const meta = detail.submission;
-  const questionsHtml = detail.questions.map((question, index) => `
-    <div class="detail-question">
-      <div class="detail-question-head">
-        <div>
-          <h3>Frage ${index + 1}</h3>
-          <div>${escapeHtml(question.text)}</div>
-        </div>
-        <div class="points-pill">${Number(question.awarded_points).toFixed(2)} / ${Number(question.max_points).toFixed(2)} Punkte</div>
-      </div>
-      ${question.options.map(option => {
-        const classes = ['option-review'];
-        if (option.is_correct) classes.push('correct');
-        if (option.is_selected) classes.push('selected');
-        if (option.is_selected && !option.is_correct) classes.push('wrong');
-        return `
-          <div class="${classes.join(' ')}">
-            <div>${escapeHtml(option.text)}</div>
-            <div class="option-tags">
-              ${option.is_correct ? '<span class="tag correct">richtig</span>' : ''}
-              ${option.is_selected ? '<span class="tag selected">gewählt</span>' : ''}
-              ${option.is_selected && !option.is_correct ? '<span class="tag wrong">falsch gewählt</span>' : ''}
-            </div>
+  try {
+    const detail = await loadSubmissionDetail(submissionId);
+    const meta = detail.submission;
+
+    const questionsHtml = detail.questions.map((question, index) => `
+      <div class="detail-question">
+        <div class="detail-question-head">
+          <div>
+            <h3>Frage ${index + 1}</h3>
+            <div>${escapeHtml(question.text)}</div>
           </div>
-        `;
-      }).join('')}
-    </div>
-  `).join('');
+          <div class="points-pill">${Number(question.awarded_points).toFixed(2)} / ${Number(question.max_points).toFixed(2)} Punkte</div>
+        </div>
+        ${question.options.map(option => {
+          const classes = ['option-review'];
+          if (option.is_correct) classes.push('correct');
+          if (option.is_selected) classes.push('selected');
+          if (option.is_selected && !option.is_correct) classes.push('wrong');
 
-  panel.innerHTML = `
-    <div class="result-box">
-      <p><strong>${escapeHtml(detail.student.full_name)}</strong> · ${escapeHtml(detail.classInfo.name)}</p>
-      <p>Test: <strong>${escapeHtml(detail.test.title)}</strong></p>
-      <p>Session: <strong>${escapeHtml(detail.session.title)}</strong></p>
-      <p>Punkte: <strong>${Number(meta.score).toFixed(2)} / ${Number(meta.max_score).toFixed(2)}</strong> · ${percent(meta.score, meta.max_score)}%</p>
-      <p>Abgegeben: <strong>${formatDateTime(meta.submitted_at)}</strong></p>
-    </div>
-    <div class="notice small">Die Detailansicht zeigt Fragen und Antworten in der gespeicherten Standardreihenfolge. Die ursprünglich zufällig angezeigte Reihenfolge wird im aktuellen Datenmodell nicht separat gespeichert.</div>
-    ${questionsHtml}
-  `;
+          return `
+            <div class="${classes.join(' ')}">
+              <div>${escapeHtml(option.text)}</div>
+              <div class="option-tags">
+                ${option.is_correct ? '<span class="tag correct">richtig</span>' : ''}
+                ${option.is_selected ? '<span class="tag selected">gewählt</span>' : ''}
+                ${option.is_selected && !option.is_correct ? '<span class="tag wrong">falsch gewählt</span>' : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `).join('');
 
-  await typesetMath(panel);
+    panel.innerHTML = `
+      <div class="result-box">
+        <p><strong>${escapeHtml(detail.student.full_name)}</strong> · ${escapeHtml(detail.classInfo.name)}</p>
+        <p>Test: <strong>${escapeHtml(detail.test.title)}</strong></p>
+        <p>Session: <strong>${escapeHtml(detail.session.title)}</strong></p>
+        <p>Punkte: <strong>${Number(meta.score).toFixed(2)} / ${Number(meta.max_score).toFixed(2)}</strong> · ${percent(meta.score, meta.max_score)}%</p>
+        <p>Abgegeben: <strong>${formatDateTime(meta.submitted_at)}</strong></p>
+      </div>
+      <div class="notice small">
+        Die Detailansicht zeigt Fragen und Antworten in der gespeicherten Standardreihenfolge.
+        Die ursprünglich zufällig angezeigte Reihenfolge wird im aktuellen Datenmodell nicht separat gespeichert.
+      </div>
+      ${questionsHtml}
+    `;
+
+    await typesetMath(panel);
+  } catch (error) {
+    console.error(error);
+    panel.innerHTML = `<div class="error-box">Die Detailauswertung konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+  }
 }
 
 async function handleCreateSession() {
@@ -231,8 +291,9 @@ async function handleCreateSession() {
       title,
       existingSessionId: state.activeSession?.id || null
     });
+
     actionBox.textContent = 'Session erfolgreich erzeugt.';
-    await renderTeacherActiveSession();
+    await refreshTeacherAppSections();
   } catch (error) {
     console.error(error);
     actionBox.textContent = 'Fehler beim Erzeugen der Session: ' + error.message;
@@ -241,14 +302,16 @@ async function handleCreateSession() {
 
 async function handleCloseSession() {
   const actionBox = document.getElementById('teacherActionMessage');
+
   if (!state.activeSession) {
     actionBox.textContent = 'Es gibt aktuell keine offene Session.';
     return;
   }
+
   try {
     await closeSession(state.activeSession.id);
     actionBox.textContent = 'Session wurde geschlossen.';
-    await renderTeacherActiveSession();
+    await refreshTeacherAppSections();
   } catch (error) {
     console.error(error);
     actionBox.textContent = 'Fehler beim Schließen der Session: ' + error.message;
@@ -259,14 +322,17 @@ async function handleImportCsv() {
   const fileInput = document.getElementById('csvFileInput');
   const classSelect = document.getElementById('importClassSelect');
   const messageBox = document.getElementById('csvImportMessage');
+
   messageBox.textContent = '';
 
   const classId = classSelect.value;
   const file = fileInput.files?.[0];
+
   if (!classId) {
     messageBox.textContent = 'Bitte zuerst eine Klasse auswählen.';
     return;
   }
+
   if (!file) {
     messageBox.textContent = 'Bitte zuerst eine CSV-Datei auswählen.';
     return;
@@ -275,10 +341,12 @@ async function handleImportCsv() {
   try {
     const csvText = await file.text();
     const parsedRows = parseCsvText(csvText);
+
     if (!parsedRows.length) {
       messageBox.textContent = 'Es wurden keine gültigen Einträge gefunden.';
       return;
     }
+
     const count = await importStudents(classId, parsedRows.map(row => row.displayName));
     messageBox.textContent = `${count} Schüler erfolgreich importiert.`;
     fileInput.value = '';
@@ -292,6 +360,7 @@ async function handleLogin() {
   const email = document.getElementById('teacherEmail').value.trim();
   const password = document.getElementById('teacherPassword').value;
   const messageBox = document.getElementById('teacherLoginMessage');
+
   messageBox.textContent = '';
 
   if (!email || !password) {
@@ -301,7 +370,9 @@ async function handleLogin() {
 
   try {
     await loginTeacher(email, password);
-    await renderTeacherApp();
+    messageBox.textContent = '';
+    // Kein direktes renderTeacherApp() hier.
+    // Das übernimmt onTeacherAuthChange().
   } catch (error) {
     console.error(error);
     messageBox.textContent = 'Login fehlgeschlagen: ' + error.message;
@@ -309,50 +380,71 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
-  const messageBox = document.getElementById('teacherLoginMessage');
+  clearTeacherLoginFields();
+  showTeacherLogin();
+
   try {
     await logoutTeacher();
-    document.getElementById('teacherEmail').value = '';
-    document.getElementById('teacherPassword').value = '';
-    messageBox.textContent = '';
-    window.location.href = './teacher.html';
   } catch (error) {
-    console.error(error);
-    alert('Logout fehlgeschlagen: ' + error.message);
+    console.error('Logout fehlgeschlagen:', error);
+  } finally {
+    window.location.replace('./teacher.html');
   }
 }
 
 async function handleResetSubmission(submissionId, studentName) {
-  const ok = window.confirm(`Soll die Abgabe von ${studentName} wirklich zurückgesetzt werden? Danach kann der Test erneut geschrieben werden.`);
+  const ok = window.confirm(
+    `Soll die Abgabe von ${studentName} wirklich zurückgesetzt werden? Danach kann der Test erneut geschrieben werden.`
+  );
   if (!ok) return;
 
   try {
     await resetSubmission(submissionId);
+
     if (state.selectedSubmissionId === submissionId) {
       state.selectedSubmissionId = null;
     }
+
     await renderResultsOverview();
   } catch (error) {
     console.error(error);
-    alert('Zurücksetzen fehlgeschlagen: ' + error.message + '\n\nDafür ist in Supabase zusätzlich eine DELETE-Policy für submissions und submission_answers nötig.');
+    alert(
+      'Zurücksetzen fehlgeschlagen: ' +
+      error.message +
+      '\n\nDafür ist in Supabase zusätzlich eine DELETE-Policy für submissions und submission_answers nötig.'
+    );
   }
+}
+
+async function refreshTeacherAppSections() {
+  const thisRun = ++state.renderRun;
+  setTeacherStatus('info', 'Daten werden geladen ...');
+
+  const results = await Promise.allSettled([
+    populateTeacherSelectors(),
+    renderTeacherActiveSession(),
+    renderResultsOverview()
+  ]);
+
+  if (thisRun !== state.renderRun) return;
+
+  const errors = results
+    .filter(result => result.status === 'rejected')
+    .map(result => result.reason?.message || 'Unbekannter Fehler');
+
+  if (errors.length === 0) {
+    setTeacherStatus('success', 'Verbindung zu Supabase erfolgreich.');
+  } else {
+    console.error('Teilweise Ladefehler:', errors);
+    setTeacherStatus('error', 'Ein Teil der Daten konnte nicht geladen werden: ' + errors.join(' | '));
+  }
+
+  await typesetMath(teacherApp);
 }
 
 async function renderTeacherApp() {
   showTeacherApp();
-  try {
-    await testSupabaseConnection();
-    document.getElementById('teacherStatusBox').className = 'success-box';
-    document.getElementById('teacherStatusBox').textContent = 'Verbindung zu Supabase erfolgreich.';
-    await populateTeacherSelectors();
-    await renderTeacherActiveSession();
-    await renderResultsOverview();
-  } catch (error) {
-    console.error(error);
-    document.getElementById('teacherStatusBox').className = 'error-box';
-    document.getElementById('teacherStatusBox').textContent = 'Fehler bei der Verbindung oder beim Laden der Daten: ' + error.message;
-  }
-  await typesetMath(teacherApp);
+  await refreshTeacherAppSections();
 }
 
 async function route() {
@@ -365,18 +457,29 @@ async function route() {
 
   try {
     getSupabaseClient();
-    await testSupabaseConnection();
+    await tryRefreshExistingSession();
   } catch (error) {
     console.error(error);
-    showLoading('Die Verbindung zu Supabase konnte nicht hergestellt werden: ' + error.message);
+    showLoading('Supabase konnte nicht initialisiert werden: ' + error.message);
     return;
   }
 
-  const loggedIn = await hasTeacherSession();
-  if (loggedIn) {
-    await renderTeacherApp();
-  } else {
+  try {
+    const loggedIn = await hasTeacherSession();
+
+    if (loggedIn) {
+      await renderTeacherApp();
+    } else {
+      showTeacherLogin();
+    }
+  } catch (error) {
+    console.error(error);
     showTeacherLogin();
+
+    const messageBox = document.getElementById('teacherLoginMessage');
+    if (messageBox) {
+      messageBox.textContent = 'Die Session konnte nicht geprüft werden: ' + error.message;
+    }
   }
 }
 
@@ -397,7 +500,10 @@ document.addEventListener('click', async (event) => {
 
   const resetButton = event.target.closest('.js-reset-result');
   if (resetButton) {
-    await handleResetSubmission(resetButton.dataset.submissionId, resetButton.dataset.studentName || 'diesem Schüler');
+    await handleResetSubmission(
+      resetButton.dataset.submissionId,
+      resetButton.dataset.studentName || 'diesem Schüler'
+    );
   }
 });
 
@@ -406,6 +512,17 @@ onTeacherAuthChange(async (_event, session) => {
     await renderTeacherApp();
   } else {
     showTeacherLogin();
+  }
+});
+
+window.addEventListener('offline', () => {
+  setTeacherStatus('error', 'Keine Netzwerkverbindung. Bitte Verbindung prüfen.');
+});
+
+window.addEventListener('online', async () => {
+  if (!teacherApp.classList.contains('hidden')) {
+    setTeacherStatus('info', 'Netzwerk wieder verfügbar. Daten werden neu geladen ...');
+    await refreshTeacherAppSections();
   }
 });
 
