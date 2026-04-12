@@ -513,29 +513,77 @@
       return data || [];
     }
 
-    function parseCsvLine(line) {
-      const result = [];
-      let current = '';
-      let inQuotes = false;
+    function parseCsvLine(line, delimiter = ',') {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
 
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const next = line[i + 1];
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
 
-        if (char === '"') {
-          if (inQuotes && next === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
-        } else if (char === ',' && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
       }
+    } else if (char === delimiter && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+function parseCsvText(csvText) {
+  const lines = csvText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  if (!lines.length) {
+    throw new Error('Die CSV-Datei ist leer.');
+  }
+
+  const firstLine = lines[0];
+  const delimiter = firstLine.includes(';') ? ';' : ',';
+
+  const headers = parseCsvLine(firstLine, delimiter);
+  const vornameIndex = headers.findIndex(h => h.trim() === 'Vorname');
+  const nachnameIndex = headers.findIndex(h => h.trim() === 'Nachname');
+
+  if (vornameIndex === -1 || nachnameIndex === -1) {
+    throw new Error('Die CSV muss die Spalten "Vorname" und "Nachname" enthalten.');
+  }
+
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCsvLine(lines[i], delimiter);
+    const vorname = (values[vornameIndex] || '').trim();
+    const nachname = (values[nachnameIndex] || '').trim();
+
+    if (!vorname || !nachname) continue;
+
+    const displayName = `${vorname} ${nachname.charAt(0).toUpperCase()}.`;
+
+    rows.push({
+      vorname,
+      nachname,
+      displayName
+    });
+  }
+
+  return rows;
+}
 
       result.push(current.trim());
       return result;
