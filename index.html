@@ -463,8 +463,26 @@
     }
 
     async function logoutTeacher() {
-      await supabaseClient.auth.signOut();
-      showTeacherLogin();
+      const messageBox = document.getElementById('teacherLoginMessage');
+    
+      try {
+        const { error } = await supabaseClient.auth.signOut();
+    
+        if (error) {
+          console.error('Logout fehlgeschlagen:', error);
+          alert('Logout fehlgeschlagen: ' + error.message);
+          return;
+        }
+    
+        document.getElementById('teacherEmail').value = '';
+        document.getElementById('teacherPassword').value = '';
+        if (messageBox) messageBox.textContent = '';
+    
+        window.location.href = `${getBaseUrl()}?mode=teacher`;
+      } catch (error) {
+        console.error('Logout-Fehler:', error);
+        alert('Logout fehlgeschlagen: ' + error.message);
+      }
     }
 
     async function hasTeacherSession() {
