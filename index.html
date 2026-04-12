@@ -303,6 +303,27 @@
     <div id="studentApp" class="hidden"></div>
   </div>
 
+  <section class="card" style="margin-top:20px;">
+  <h2>Klassenliste aus CSV importieren</h2>
+
+  <div class="row">
+    <div style="flex:1 1 220px;">
+      <label for="importClassSelect">Klasse</label>
+      <select id="importClassSelect"></select>
+    </div>
+    <div style="flex:1 1 320px;">
+      <label for="csvFileInput">CSV-Datei</label>
+      <input id="csvFileInput" type="file" accept=".csv,text/csv" />
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="importCsvBtn">CSV importieren</button>
+  </div>
+
+  <div id="csvImportMessage" class="small">Noch keine CSV importiert.</div>
+</section>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
