@@ -227,10 +227,41 @@ async function startStudentTest({ session, cls, test, student }) {
           maxScore: Number(maxScore.toFixed(2))
         });
 
-        const detailList = answerPayload
-          .map((answer, i) => `<li>Frage ${i + 1}: ${answer.awarded_points.toFixed(2)} Punkt(e)</li>`)
-          .join('');
-
+        const reviewHtml = randomizedQuestions.map((question, qi) => {
+          const answer = answerPayload.find(a => a.question_id === question.id);
+          const selectedIds = new Set(answer?.selected_option_ids || []);
+        
+          const optionsHtml = question.options.map((opt) => {
+            const wasSelected = selectedIds.has(opt.id);
+            const isCorrect = !!opt.is_correct;
+        
+            let badges = '';
+            if (wasSelected) badges += '<span class="badge warning">Gewählt</span> ';
+            if (isCorrect) badges += '<span class="badge success">Richtig</span>';
+            if (wasSelected && !isCorrect) badges += ' <span class="badge danger">Falsch gewählt</span>';
+        
+            return `
+              <div class="review-option ${isCorrect ? 'review-correct' : ''} ${wasSelected ? 'review-selected' : ''}">
+                <div>
+                  <div>${escapeHtml(opt.text)}</div>
+                  <div class="row" style="margin-top:8px;">${badges}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        
+          return `
+            <div class="question">
+              <h3>Frage ${qi + 1}</h3>
+              <p>${escapeHtml(question.text)}</p>
+              <div class="small" style="margin-bottom:10px;">
+                Erreichte Punkte: <strong>${answer ? answer.awarded_points.toFixed(2) : '0.00'}</strong> / ${(question.max_points || 1).toFixed(2)}
+              </div>
+              ${optionsHtml}
+            </div>
+          `;
+        }).join('');
+        
         showStudentApp();
         studentApp.innerHTML = `
           <div class="card">
@@ -240,8 +271,16 @@ async function startStudentTest({ session, cls, test, student }) {
               <p>Quote: <strong>${Math.round((score / maxScore) * 100)}%</strong></p>
               <p>${autoSubmitted ? 'Der Test wurde wegen Zeitablauf automatisch abgegeben.' : 'Der Test wurde erfolgreich abgegeben.'}</p>
             </div>
-            <h3>Auswertung</h3>
-            <ol>${detailList}</ol>
+        
+            <div class="info">
+              <strong>Legende:</strong><br>
+              <span class="badge warning">Gewählt</span>
+              <span class="badge success">Richtig</span>
+              <span class="badge danger">Falsch gewählt</span>
+            </div>
+        
+            <h3>Auswertung im Detail</h3>
+            ${reviewHtml}
           </div>
         `;
         await typesetMath(studentApp);
