@@ -321,14 +321,6 @@ async function route() {
     return;
   }
 
-  try {
-    await testSupabaseConnection();
-  } catch (error) {
-    console.error(error);
-    showLoading('Die Verbindung zu Supabase konnte nicht hergestellt werden: ' + error.message);
-    return;
-  }
-
   const sessionCode = getUrlParams().get('session');
   if (!sessionCode) {
     await showStudentMessage('Kein aktiver Test', 'Dieser Link enthält keine Session-ID. Nutze den QR-Code oder den Session-Link der Lehrkraft.', 'error');
