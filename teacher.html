@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lernkontrollen – Lehrkraft</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <script>
+    window.MathJax = {
+      loader: { load: ['[tex]/mhchem'] },
+      tex: {
+        packages: { '[+]': ['mhchem'] },
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div id="loadingApp" class="card">
+      <h1>Lernkontrollen</h1>
+      <p class="subtitle">Die Anwendung wird geladen ...</p>
+    </div>
+
+    <div id="teacherLogin" class="teacher-login hidden card">
+      <h1>Lehrkraft-Login</h1>
+      <p class="subtitle">Anmeldung über Supabase Auth</p>
+
+      <label for="teacherEmail">E-Mail</label>
+      <input id="teacherEmail" type="text" placeholder="name@schule.de" />
+
+      <label for="teacherPassword" style="margin-top:12px;">Passwort</label>
+      <input id="teacherPassword" type="password" placeholder="Passwort eingeben" />
+
+      <div class="row" style="margin-top:12px;">
+        <button id="teacherLoginBtn">Einloggen</button>
+      </div>
+
+      <div id="teacherLoginMessage" class="small"></div>
+    </div>
+
+    <div id="teacherApp" class="hidden">
+      <div class="topbar">
+        <div>
+          <h1>Lernkontrollen – Lehrkraft</h1>
+          <p class="subtitle">Session-Freigabe, CSV-Import und Ergebnisansicht in getrennter Lehrerdatei.</p>
+        </div>
+        <div class="row">
+          <a href="./index.html"><button class="secondary" type="button">Startseite</button></a>
+          <button id="teacherLogoutBtn" class="secondary">Logout</button>
+        </div>
+      </div>
+
+      <section class="card" style="margin-bottom:20px;">
+        <h2>Supabase-Status</h2>
+        <div id="teacherStatusBox" class="info">Verbindung wird geprüft ...</div>
+        <p class="small">Der Lehrerbereich benötigt passende Policies für Lesen, Schreiben und Löschen von Sessions und Ergebnissen.</p>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Test freigeben</h2>
+          <div class="row">
+            <div style="flex:1 1 220px;">
+              <label for="classSelect">Klasse</label>
+              <select id="classSelect"></select>
+            </div>
+            <div style="flex:1 1 220px;">
+              <label for="testSelect">Test</label>
+              <select id="testSelect"></select>
+            </div>
+          </div>
+          <div class="row">
+            <div style="flex:1 1 160px;">
+              <label for="durationInput">Zeit in Minuten</label>
+              <input id="durationInput" type="text" value="15" />
+            </div>
+            <div style="flex:1 1 220px;">
+              <label for="sessionLabel">Freigabetitel</label>
+              <input id="sessionLabel" type="text" value="Lernkontrolle heute" />
+            </div>
+          </div>
+          <div class="row">
+            <button id="createSessionBtn">Session erzeugen</button>
+            <button id="closeSessionBtn" class="danger">Aktive Session schließen</button>
+          </div>
+          <div id="teacherActionMessage" class="small">Noch keine Aktion ausgeführt.</div>
+        </section>
+
+        <section class="card">
+          <h2>Aktive Session</h2>
+          <div id="activeSessionInfo" class="small">Keine offene Session gefunden.</div>
+          <div id="qrcode"></div>
+          <div id="sessionLinkBox" class="session-link">Noch kein Link erzeugt.</div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top:20px;">
+        <h2>Klassenliste aus CSV importieren</h2>
+        <div class="row">
+          <div style="flex:1 1 220px;">
+            <label for="importClassSelect">Klasse</label>
+            <select id="importClassSelect"></select>
+          </div>
+          <div style="flex:1 1 320px;">
+            <label for="csvFileInput">CSV-Datei</label>
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" />
+          </div>
+        </div>
+        <div class="row">
+          <button id="importCsvBtn">CSV importieren</button>
+        </div>
+        <div id="csvImportMessage" class="small">Noch keine CSV importiert.</div>
+      </section>
+
+      <section class="card" style="margin-top:20px;">
+        <h2>Ergebnisse</h2>
+        <div id="resultsSummary" class="small">Noch keine Ergebnisse vorhanden.</div>
+        <div class="two-col" style="margin-top: 16px;">
+          <div>
+            <div style="overflow:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Klasse</th>
+                    <th>Test</th>
+                    <th>Session</th>
+                    <th>Name</th>
+                    <th>Punkte</th>
+                    <th>Quote</th>
+                    <th>Abgegeben</th>
+                    <th>Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="resultsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="row" style="margin-top:12px;">
+              <button id="refreshResultsBtn" class="secondary">Ergebnisse neu laden</button>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="background:#fafafa;">
+              <h3>Detailauswertung</h3>
+              <div id="resultDetailPanel"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script type="module" src="./js/teacher.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lernkontrollen – Test</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <script>
+    window.MathJax = {
+      loader: { load: ['[tex]/mhchem'] },
+      tex: {
+        packages: { '[+]': ['mhchem'] },
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div id="loadingApp" class="card">
+      <h1>Lernkontrollen</h1>
+      <p class="subtitle">Die Anwendung wird geladen ...</p>
+    </div>
+
+    <div id="studentApp" class="hidden"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="./js/student.js"></script>
+</body>
+</html>
