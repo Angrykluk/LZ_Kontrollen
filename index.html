@@ -195,6 +195,23 @@
       margin: 80px auto;
     }
   </style>
+  <script>
+  window.MathJax = {
+    loader: {
+      load: ['[tex]/mhchem']
+    },
+    tex: {
+      packages: { '[+]': ['mhchem'] },
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']]
+    },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  
 </head>
 <body>
   <div class="container">
@@ -405,7 +422,7 @@
       loadingApp.innerHTML = `<h1>Lernkontrollen</h1><p class="subtitle">${escapeHtml(message)}</p>`;
     }
 
-    function showStudentMessage(title, text, type = 'info') {
+    async function showStudentMessage(title, text, type = 'info') {
       const boxClass = type === 'error' ? 'error-box' : type === 'success' ? 'success-box' : 'info';
       showStudentApp();
       studentApp.innerHTML = `
@@ -414,7 +431,15 @@
           <div class="${boxClass}">${escapeHtml(text)}</div>
         </div>
       `;
+      await typesetMath(studentApp);
     }
+
+    async function typesetMath(root = document.body) {
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        await window.MathJax.typesetPromise([root]);
+      }
+    }
+        
 
     function validateSupabaseConfig() {
       return !SUPABASE_URL.startsWith('HIER_') && !SUPABASE_ANON_KEY.startsWith('HIER_');
@@ -872,6 +897,7 @@ async function importStudentsFromCsv() {
         document.getElementById('teacherStatusBox').className = 'error-box';
         document.getElementById('teacherStatusBox').textContent = 'Fehler bei der Verbindung oder beim Laden der Daten: ' + error.message;
       }
+      await typesetMath(studentApp);
     }
 
     async function createSession() {
@@ -1091,6 +1117,7 @@ async function importStudentsFromCsv() {
             <p class="small">Ein Name kann diese Session nur einmal abgeben.</p>
           </div>
         `;
+        await typesetMath(studentApp);
 
         document.getElementById('startTestBtn').onclick = async () => {
           const studentId = document.getElementById('studentNameSelect').value;
@@ -1160,6 +1187,8 @@ async function importStudentsFromCsv() {
           </div>
         `;
 
+        await typesetMath(studentApp);
+
         const form = document.getElementById('testForm');
         form.innerHTML = randomizedQuestions.map((q, qi) => `
           <div class="question">
@@ -1173,6 +1202,8 @@ async function importStudentsFromCsv() {
             `).join('')}
           </div>
         `).join('');
+
+        await typesetMath(studentApp);
 
         async function submitTest(autoSubmitted = false) {
           if (submitted) return;
