@@ -183,41 +183,42 @@ async function startStudentTest({ session, cls, test, student }) {
       if (submitted) return;
       submitted = true;
       clearInterval(studentTestRuntime?.timerHandle);
-
+    
       const doubleCheck = await studentAlreadySubmitted(session.id, student.id);
       if (doubleCheck) {
         await showStudentMessage('Bereits durchgeführt', `${student.full_name} hat diesen Test bereits bearbeitet.`, 'error');
         return;
       }
-
+    
       const answerPayload = [];
       let score = 0;
       let maxScore = 0;
-
+    
       randomizedQuestions.forEach((question, qi) => {
         const selectedIndices = [...document.querySelectorAll(`input[name="q_${qi}"]:checked`)]
           .map(input => Number(input.value));
         const selectedOptions = selectedIndices.map(index => question.options[index]);
         const selectedOptionIds = selectedOptions.map(opt => opt.id);
-
+    
         const totalCorrect = question.options.filter(opt => opt.is_correct).length;
         const correctSelected = selectedOptions.filter(opt => opt.is_correct).length;
         const wrongSelected = selectedOptions.filter(opt => !opt.is_correct).length;
-
+    
         const rawFraction = (correctSelected - wrongSelected) / totalCorrect;
         const fraction = Math.max(0, Math.min(1, rawFraction));
         const awardedPoints = Number((fraction * (question.max_points || 1)).toFixed(2));
-
+    
         score += awardedPoints;
         maxScore += (question.max_points || 1);
-
+    
         answerPayload.push({
           question_id: question.id,
           selected_option_ids: selectedOptionIds,
           awarded_points: awardedPoints,
           selected_indices: selectedIndices
         });
-
+      });
+    
       try {
         await saveSubmissionWithAnswers({
           session,
@@ -226,20 +227,20 @@ async function startStudentTest({ session, cls, test, student }) {
           score: Number(score.toFixed(2)),
           maxScore: Number(maxScore.toFixed(2))
         });
-
+    
         const reviewHtml = randomizedQuestions.map((question, qi) => {
           const answer = answerPayload.find(a => a.question_id === question.id);
           const selectedIds = new Set(answer?.selected_option_ids || []);
-        
+    
           const optionsHtml = question.options.map((opt) => {
             const wasSelected = selectedIds.has(opt.id);
             const isCorrect = !!opt.is_correct;
-        
+    
             let badges = '';
             if (wasSelected) badges += '<span class="badge warning">Gewählt</span> ';
             if (isCorrect) badges += '<span class="badge success">Richtig</span>';
-            if (wasSelected && !isCorrect) badges += ' <span class="badge danger">Falsch gewählt</span>';
-        
+            if (wasSelected && !isCorrect) badges += '<span class="badge danger">Falsch gewählt</span>';
+    
             return `
               <div class="review-option ${isCorrect ? 'review-correct' : ''} ${wasSelected ? 'review-selected' : ''}">
                 <div>
@@ -249,7 +250,7 @@ async function startStudentTest({ session, cls, test, student }) {
               </div>
             `;
           }).join('');
-        
+    
           return `
             <div class="question">
               <h3>Frage ${qi + 1}</h3>
@@ -261,7 +262,7 @@ async function startStudentTest({ session, cls, test, student }) {
             </div>
           `;
         }).join('');
-        
+    
         showStudentApp();
         studentApp.innerHTML = `
           <div class="card">
@@ -271,14 +272,14 @@ async function startStudentTest({ session, cls, test, student }) {
               <p>Quote: <strong>${Math.round((score / maxScore) * 100)}%</strong></p>
               <p>${autoSubmitted ? 'Der Test wurde wegen Zeitablauf automatisch abgegeben.' : 'Der Test wurde erfolgreich abgegeben.'}</p>
             </div>
-        
+    
             <div class="info">
               <strong>Legende:</strong><br>
               <span class="badge warning">Gewählt</span>
               <span class="badge success">Richtig</span>
               <span class="badge danger">Falsch gewählt</span>
             </div>
-        
+    
             <h3>Auswertung im Detail</h3>
             ${reviewHtml}
           </div>
