@@ -1,5 +1,5 @@
 export const SUPABASE_URL = 'https://coefkjaznubmytkjtymn.supabase.co';
-export const SUPABASE_ANON_KEY = 'DEIN_ANON_KEY';
+export const SUPABASE_ANON_KEY = 'sb_publishable_qESYzhFnwJGGpH4ujKuKsw_KPjSYRgs';
 
 let supabaseClient = null;
 
