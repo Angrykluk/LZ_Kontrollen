@@ -974,7 +974,7 @@ async function importStudentsFromCsv() {
     async function loadQuestionsForTest(testId) {
       const { data: questions, error: questionsError } = await supabaseClient
         .from('questions')
-        .select('id, question_text, question_order')
+        .select('id, question_text, question_order, max_points')
         .eq('test_id', testId)
         .order('question_order', { ascending: true });
       if (questionsError) throw questionsError;
@@ -1026,11 +1026,12 @@ async function importStudentsFromCsv() {
 
       if (submissionError) throw submissionError;
 
-      const answerRows = answers.map(answer => ({
-        submission_id: submission.id,
-        question_id: answer.question_id,
-        selected_option_ids: answer.selected_option_ids
-      }));
+        const answerRows = answers.map(answer => ({
+          submission_id: submission.id,
+          question_id: answer.question_id,
+          selected_option_ids: answer.selected_option_ids,
+          awarded_points: answer.awarded_points
+        }));
 
       if (answerRows.length) {
         const { error: answersError } = await supabaseClient
@@ -1129,6 +1130,7 @@ async function importStudentsFromCsv() {
             id: q.id,
             order: qIndex + 1,
             text: q.question_text,
+            max_points: q.max_points || 1,
             options: shuffledOptions
           };
         });
@@ -1185,21 +1187,30 @@ async function importStudentsFromCsv() {
 
           const answerPayload = [];
           let score = 0;
-
+          let maxScore = 0;
+          
           randomizedQuestions.forEach((question, qi) => {
-            const selectedIndices = [...document.querySelectorAll(`input[name="q_${qi}"]:checked`)].map(input => Number(input.value));
+            const selectedIndices = [...document.querySelectorAll(`input[name="q_${qi}"]:checked`)]
+              .map(input => Number(input.value));
+          
             const selectedOptions = selectedIndices.map(index => question.options[index]);
             const selectedOptionIds = selectedOptions.map(opt => opt.id);
-            const selectedCorrectIds = selectedOptions.filter(opt => opt.is_correct).map(opt => opt.id).sort();
-            const allCorrectIds = question.options.filter(opt => opt.is_correct).map(opt => opt.id).sort();
-            const selectedSorted = [...selectedOptionIds].sort();
-            const isCorrect = JSON.stringify(selectedSorted) === JSON.stringify(allCorrectIds) && JSON.stringify(selectedCorrectIds) === JSON.stringify(allCorrectIds);
-
-            if (isCorrect) score += 1;
+          
+            const totalCorrect = question.options.filter(opt => opt.is_correct).length;
+            const correctSelected = selectedOptions.filter(opt => opt.is_correct).length;
+            const wrongSelected = selectedOptions.filter(opt => !opt.is_correct).length;
+          
+            const rawFraction = (correctSelected - wrongSelected) / totalCorrect;
+            const fraction = Math.max(0, Math.min(1, rawFraction));
+            const awardedPoints = Number((fraction * (question.max_points || 1)).toFixed(2));
+          
+            score += awardedPoints;
+            maxScore += (question.max_points || 1);
+          
             answerPayload.push({
               question_id: question.id,
               selected_option_ids: selectedOptionIds,
-              is_correct: isCorrect
+              awarded_points: awardedPoints
             });
           });
 
@@ -1208,8 +1219,8 @@ async function importStudentsFromCsv() {
               session,
               studentId: student.id,
               answers: answerPayload,
-              score,
-              maxScore: randomizedQuestions.length
+              score: Number(score.toFixed(2)),
+              maxScore: Number(maxScore.toFixed(2))
             });
 
             const detailList = answerPayload.map((answer, i) => `<li>Frage ${i + 1}: ${answer.is_correct ? 'richtig' : 'falsch'}</li>`).join('');
@@ -1218,8 +1229,8 @@ async function importStudentsFromCsv() {
               <div class="card">
                 <h1>Ergebnis</h1>
                 <div class="result-box">
-                  <p><strong>${escapeHtml(student.full_name)}</strong>, du hast <strong>${score} von ${randomizedQuestions.length}</strong> Punkten erreicht.</p>
-                  <p>Quote: <strong>${Math.round((score / randomizedQuestions.length) * 100)}%</strong></p>
+                  <p><strong>${escapeHtml(student.full_name)}</strong>, du hast <strong>${score.toFixed(2)} von ${maxScore.toFixed(2)}</strong> Punkten erreicht.</p>
+                  <p>Quote: <strong>${Math.round((score / maxScore) * 100)}%</strong></p>
                   <p>${autoSubmitted ? 'Der Test wurde wegen Zeitablauf automatisch abgegeben.' : 'Der Test wurde erfolgreich abgegeben.'}</p>
                 </div>
                 <h3>Auswertung</h3>
