@@ -288,3 +288,19 @@ code.inline {
   padding: 2px 6px;
   border-radius: 6px;
 }
+.review-option {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.review-correct {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.review-selected {
+  box-shadow: inset 0 0 0 2px #fbbf24;
+}
