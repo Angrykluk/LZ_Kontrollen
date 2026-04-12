@@ -504,16 +504,16 @@
       return data;
     }
 
-    async function loadClasses() {
-      const { data, error } = await supabaseClient
-        .from('classes')
-        .select('id, name')
-        .order('name');
-      if (error) throw error;
-      return data || [];
-    }
+async function loadClasses() {
+  const { data, error } = await supabaseClient
+    .from('classes')
+    .select('id, name')
+    .order('name');
+  if (error) throw error;
+  return data || [];
+}
 
-    function parseCsvLine(line, delimiter = ',') {
+function parseCsvLine(line, delimiter = ',') {
   const result = [];
   let current = '';
   let inQuotes = false;
@@ -542,7 +542,9 @@
 }
 
 function parseCsvText(csvText) {
-  const lines = csvText
+  const cleanedText = csvText.replace(/^\uFEFF/, '');
+
+  const lines = cleanedText
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .split('\n')
@@ -556,9 +558,9 @@ function parseCsvText(csvText) {
   const firstLine = lines[0];
   const delimiter = firstLine.includes(';') ? ';' : ',';
 
-  const headers = parseCsvLine(firstLine, delimiter);
-  const vornameIndex = headers.findIndex(h => h.trim() === 'Vorname');
-  const nachnameIndex = headers.findIndex(h => h.trim() === 'Nachname');
+  const headers = parseCsvLine(firstLine, delimiter).map(h => h.trim());
+  const vornameIndex = headers.findIndex(h => h === 'Vorname');
+  const nachnameIndex = headers.findIndex(h => h === 'Nachname');
 
   if (vornameIndex === -1 || nachnameIndex === -1) {
     throw new Error('Die CSV muss die Spalten "Vorname" und "Nachname" enthalten.');
@@ -585,115 +587,69 @@ function parseCsvText(csvText) {
   return rows;
 }
 
-      result.push(current.trim());
-      return result;
+async function populateImportClassSelect() {
+  const classes = await loadClasses();
+  const select = document.getElementById('importClassSelect');
+  if (!select) return;
+
+  select.innerHTML = classes.length
+    ? classes.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')
+    : '<option value="">Keine Klasse vorhanden</option>';
+}
+
+async function importStudentsFromCsv() {
+  const fileInput = document.getElementById('csvFileInput');
+  const classSelect = document.getElementById('importClassSelect');
+  const messageBox = document.getElementById('csvImportMessage');
+
+  messageBox.textContent = '';
+
+  const loggedIn = await hasTeacherSession();
+  if (!loggedIn) {
+    messageBox.textContent = 'Der CSV-Import ist nur nach dem Login möglich.';
+    return;
+  }
+
+  const classId = classSelect.value;
+  const file = fileInput.files?.[0];
+
+  if (!classId) {
+    messageBox.textContent = 'Bitte zuerst eine Klasse auswählen.';
+    return;
+  }
+
+  if (!file) {
+    messageBox.textContent = 'Bitte zuerst eine CSV-Datei auswählen.';
+    return;
+  }
+
+  try {
+    const csvText = await file.text();
+    const parsedRows = parseCsvText(csvText);
+
+    if (!parsedRows.length) {
+      messageBox.textContent = 'Es wurden keine gültigen Einträge gefunden.';
+      return;
     }
 
-    function parseCsvText(csvText) {
-      const lines = csvText
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n')
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
+    const rowsToInsert = parsedRows.map(row => ({
+      class_id: classId,
+      full_name: row.displayName
+    }));
 
-      if (!lines.length) {
-        throw new Error('Die CSV-Datei ist leer.');
-      }
+    const { error } = await supabaseClient
+      .from('students')
+      .insert(rowsToInsert);
 
-      const headers = parseCsvLine(lines[0]);
-      const vornameIndex = headers.findIndex(h => h === 'Vorname');
-      const nachnameIndex = headers.findIndex(h => h === 'Nachname');
+    if (error) throw error;
 
-      if (vornameIndex === -1 || nachnameIndex === -1) {
-        throw new Error('Die CSV muss die Spalten "Vorname" und "Nachname" enthalten.');
-      }
-
-      const rows = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = parseCsvLine(lines[i]);
-        const vorname = (values[vornameIndex] || '').trim();
-        const nachname = (values[nachnameIndex] || '').trim();
-
-        if (!vorname || !nachname) continue;
-
-        const displayName = `${vorname} ${nachname.charAt(0).toUpperCase()}.`;
-
-        rows.push({
-          vorname,
-          nachname,
-          displayName
-        });
-      }
-
-      return rows;
-    }
-
-    async function populateImportClassSelect() {
-      const classes = await loadClasses();
-      const select = document.getElementById('importClassSelect');
-      if (!select) return;
-
-      select.innerHTML = classes.length
-        ? classes.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')
-        : '<option value="">Keine Klasse vorhanden</option>';
-    }
-
-    async function importStudentsFromCsv() {
-      const fileInput = document.getElementById('csvFileInput');
-      const classSelect = document.getElementById('importClassSelect');
-      const messageBox = document.getElementById('csvImportMessage');
-
-      messageBox.textContent = '';
-
-      const loggedIn = await hasTeacherSession();
-      if (!loggedIn) {
-        messageBox.textContent = 'Der CSV-Import ist nur nach dem Login möglich.';
-        return;
-      }
-
-      const classId = classSelect.value;
-      const file = fileInput.files?.[0];
-
-      if (!classId) {
-        messageBox.textContent = 'Bitte zuerst eine Klasse auswählen.';
-        return;
-      }
-
-      if (!file) {
-        messageBox.textContent = 'Bitte zuerst eine CSV-Datei auswählen.';
-        return;
-      }
-
-      try {
-        const csvText = await file.text();
-        const parsedRows = parseCsvText(csvText);
-
-        if (!parsedRows.length) {
-          messageBox.textContent = 'Es wurden keine gültigen Einträge gefunden.';
-          return;
-        }
-
-        const rowsToInsert = parsedRows.map(row => ({
-          class_id: classId,
-          full_name: row.displayName
-        }));
-
-        const { error } = await supabaseClient
-          .from('students')
-          .insert(rowsToInsert);
-
-        if (error) throw error;
-
-        messageBox.textContent = `${rowsToInsert.length} Schüler erfolgreich importiert.`;
-        fileInput.value = '';
-      } catch (error) {
-        console.error(error);
-        messageBox.textContent = 'Fehler beim CSV-Import: ' + error.message;
-      }
-    }
-
+    messageBox.textContent = `${rowsToInsert.length} Schüler erfolgreich importiert.`;
+    fileInput.value = '';
+  } catch (error) {
+    console.error(error);
+    messageBox.textContent = 'Fehler beim CSV-Import: ' + error.message;
+  }
+}
     async function loadTests() {
       const { data, error } = await supabaseClient
         .from('tests')
