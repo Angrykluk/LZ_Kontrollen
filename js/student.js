@@ -214,9 +214,9 @@ async function startStudentTest({ session, cls, test, student }) {
         answerPayload.push({
           question_id: question.id,
           selected_option_ids: selectedOptionIds,
-          awarded_points: awardedPoints
+          awarded_points: awardedPoints,
+          selected_indices: selectedIndices
         });
-      });
 
       try {
         await saveSubmissionWithAnswers({
