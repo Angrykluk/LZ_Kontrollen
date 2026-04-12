@@ -1223,7 +1223,9 @@ async function importStudentsFromCsv() {
               maxScore: Number(maxScore.toFixed(2))
             });
 
-            const detailList = answerPayload.map((answer, i) => `<li>Frage ${i + 1}: ${answer.is_correct ? 'richtig' : 'falsch'}</li>`).join('');
+            const detailList = answerPayload
+              .map((answer, i) => `<li>Frage ${i + 1}: ${answer.awarded_points.toFixed(2)} Punkt(e)</li>`)
+              .join('');
             showStudentApp();
             studentApp.innerHTML = `
               <div class="card">
