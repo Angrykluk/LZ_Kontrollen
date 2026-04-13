@@ -1,4 +1,9 @@
-import { getSupabaseClient, validateSupabaseConfig } from './config.js';
+import {
+  getSupabaseClient,
+  validateSupabaseConfig,
+  refreshSupabaseSessionIfPossible,
+  clearLocalSupabaseState
+} from './config.js';
 import { typesetMath } from './math.js';
 import { escapeHtml, buildStudentUrl, formatDateTime, parseCsvText, percent } from './utils.js';
 import {
@@ -73,19 +78,6 @@ function clearTeacherLoginFields() {
   if (emailInput) emailInput.value = '';
   if (passwordInput) passwordInput.value = '';
   if (messageBox) messageBox.textContent = '';
-}
-
-async function tryRefreshExistingSession() {
-  try {
-    const supabase = getSupabaseClient();
-    const { data } = await supabase.auth.getSession();
-
-    if (data?.session) {
-      await supabase.auth.refreshSession();
-    }
-  } catch (error) {
-    console.warn('Session-Refresh fehlgeschlagen:', error);
-  }
 }
 
 async function populateTeacherSelectors() {
@@ -371,8 +363,6 @@ async function handleLogin() {
   try {
     await loginTeacher(email, password);
     messageBox.textContent = '';
-    // Kein direktes renderTeacherApp() hier.
-    // Das übernimmt onTeacherAuthChange().
   } catch (error) {
     console.error(error);
     messageBox.textContent = 'Login fehlgeschlagen: ' + error.message;
@@ -382,12 +372,14 @@ async function handleLogin() {
 async function handleLogout() {
   clearTeacherLoginFields();
   showTeacherLogin();
+  setTeacherStatus('info', 'Lokale Sitzung wird zurückgesetzt ...');
 
   try {
     await logoutTeacher();
   } catch (error) {
     console.error('Logout fehlgeschlagen:', error);
   } finally {
+    clearLocalSupabaseState();
     window.location.replace('./teacher.html');
   }
 }
@@ -457,7 +449,7 @@ async function route() {
 
   try {
     getSupabaseClient();
-    await tryRefreshExistingSession();
+    await refreshSupabaseSessionIfPossible();
   } catch (error) {
     console.error(error);
     showLoading('Supabase konnte nicht initialisiert werden: ' + error.message);
@@ -474,11 +466,12 @@ async function route() {
     }
   } catch (error) {
     console.error(error);
+    clearLocalSupabaseState();
     showTeacherLogin();
 
     const messageBox = document.getElementById('teacherLoginMessage');
     if (messageBox) {
-      messageBox.textContent = 'Die Session konnte nicht geprüft werden: ' + error.message;
+      messageBox.textContent = 'Die lokale Sitzung wurde zurückgesetzt. Bitte erneut einloggen.';
     }
   }
 }
