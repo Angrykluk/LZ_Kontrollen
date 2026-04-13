@@ -1,6 +1,9 @@
 export const SUPABASE_URL = 'https://coefkjaznubmytkjtymn.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_qESYzhFnwJGGpH4ujKuKsw_KPjSYRgs';
 
+export const APP_BUILD = '2026-04-13-2';
+export const AUTH_STORAGE_VERSION = 'v2';
+
 let supabaseClient = null;
 
 function createMemoryStorage() {
@@ -35,8 +38,18 @@ function getSafeStorage() {
   }
 }
 
+function getStorageKey() {
+  return `lernkontrollen-auth-${AUTH_STORAGE_VERSION}`;
+}
+
 export function validateSupabaseConfig() {
-  return !SUPABASE_URL.startsWith('HIER_') && !SUPABASE_ANON_KEY.startsWith('HIER_');
+  return (
+    !!SUPABASE_URL &&
+    !!SUPABASE_ANON_KEY &&
+    !SUPABASE_URL.startsWith('HIER_') &&
+    !SUPABASE_ANON_KEY.startsWith('HIER_') &&
+    !SUPABASE_ANON_KEY.startsWith('DEIN_')
+  );
 }
 
 function buildSupabaseOptions() {
@@ -45,7 +58,7 @@ function buildSupabaseOptions() {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'lernkontrollen-auth-v1',
+      storageKey: getStorageKey(),
       storage: getSafeStorage()
     }
   };
@@ -81,6 +94,38 @@ export async function refreshSupabaseSessionIfPossible() {
     const { error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError) throw refreshError;
   }
+}
+
+export function clearLocalSupabaseState() {
+  try {
+    const storage = getSafeStorage();
+    const storageKey = getStorageKey();
+
+    storage.removeItem(storageKey);
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const keysToRemove = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (!key) continue;
+
+        if (
+          key === storageKey ||
+          key.startsWith('sb-') ||
+          key.includes('supabase') ||
+          key.includes('lernkontrollen-auth')
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+
+      keysToRemove.forEach(key => window.localStorage.removeItem(key));
+    }
+  } catch (error) {
+    console.warn('Lokaler Supabase-Status konnte nicht vollständig entfernt werden.', error);
+  }
+
+  resetSupabaseClient();
 }
 
 export function resetSupabaseClient() {
