@@ -485,6 +485,10 @@ document.addEventListener('click', async (event) => {
   if (id === 'closeSessionBtn') await handleCloseSession();
   if (id === 'refreshResultsBtn') await renderResultsOverview();
   if (id === 'importCsvBtn') await handleImportCsv();
+  if (id === 'repairConnectionBtn' || id === 'repairConnectionBtnTop') {
+    clearLocalSupabaseState();
+    window.location.replace('./teacher.html');
+  }
 
   const viewButton = event.target.closest('.js-view-result');
   if (viewButton) {
