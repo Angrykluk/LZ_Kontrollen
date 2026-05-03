@@ -1,4 +1,4 @@
-import { validateSupabaseConfig } from './config.js?v=2026-04-13-5';
+import { validateSupabaseConfig } from './config.js?v=2026-04-13-6';
 import { typesetMath } from './math.js?v=2026-04-13-5';
 import { escapeHtml, getUrlParams, shuffle } from './utils.js?v=2026-04-13-5';
 import {
@@ -10,7 +10,7 @@ import {
   loadQuestionsForTest,
   studentAlreadySubmitted,
   saveSubmissionWithAnswers
-} from './api.js?v=2026-04-13-5';
+} from './api.js?v=2026-04-13-6';
 
 const loadingApp = document.getElementById('loadingApp');
 const studentApp = document.getElementById('studentApp');
