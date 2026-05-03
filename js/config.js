@@ -1,7 +1,7 @@
 export const SUPABASE_URL = 'https://coefkjaznubmytkjtymn.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_qESYzhFnwJGGpH4ujKuKsw_KPjSYRgs';
 
-export const APP_BUILD = '2026-04-13-2';
+export const APP_BUILD = '2026-05-03-2';
 export const AUTH_STORAGE_VERSION = 'v2';
 
 let supabaseClient = null;
