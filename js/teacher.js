@@ -882,6 +882,53 @@ async function populateTeacherSelectors() {
   }
 }
 
+async function renderTeacherActiveSession() {
+  const active = await loadOpenSession();
+  state.activeSession = active;
+
+  const infoBox = document.getElementById('activeSessionInfo');
+  const linkBox = document.getElementById('sessionLinkBox');
+  const qrcodeBox = document.getElementById('qrcode');
+
+  if (!infoBox || !linkBox || !qrcodeBox) return;
+
+  qrcodeBox.innerHTML = '';
+
+  if (!active) {
+    infoBox.textContent = 'Keine offene Session gefunden.';
+    linkBox.textContent = 'Noch kein Link erzeugt.';
+    qrcodeBox.innerHTML = '<span class="small">Nach dem Erzeugen erscheint hier der QR-Code.</span>';
+    return;
+  }
+
+  const [cls, test] = await Promise.all([
+    loadClassById(active.class_id),
+    loadTestById(active.test_id)
+  ]);
+
+  const sessionUrl = buildStudentUrl(active.access_code);
+
+  infoBox.innerHTML = `
+    <div class="success-box">
+      <strong>${escapeHtml(active.title)}</strong><br>
+      ${escapeHtml(cls.name)} · ${escapeHtml(test.title)}<br>
+      Code: <strong>${escapeHtml(active.access_code)}</strong>
+    </div>
+  `;
+
+  linkBox.textContent = sessionUrl;
+
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(qrcodeBox, {
+      text: sessionUrl,
+      width: 200,
+      height: 200
+    });
+  } else {
+    qrcodeBox.innerHTML = '<span class="small">QR-Code-Bibliothek wurde nicht geladen.</span>';
+  }
+}
+
 async function refreshTeacherAppSections() {
   const thisRun = ++state.renderRun;
   setTeacherStatus('info', 'Daten werden geladen ...');
