@@ -1,4 +1,4 @@
-import { getSupabaseClient } from './config.js';
+import { getSupabaseClient } from './config.js?v=2026-04-13-6';
 import { uid } from './utils.js';
 
 function sleep(ms) {
