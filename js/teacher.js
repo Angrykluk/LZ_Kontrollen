@@ -3,9 +3,9 @@ import {
   validateSupabaseConfig,
   refreshSupabaseSessionIfPossible,
   clearLocalSupabaseState
-} from './config.js?v=2026-04-13-6';
-import { typesetMath } from './math.js?v=2026-04-13-6';
-import { escapeHtml, buildStudentUrl, formatDateTime, parseCsvText, percent } from './utils.js?v=2026-04-13-6';
+} from './config.js?v=2026-05-03-1';
+import { typesetMath } from './math.js?v=2026-05-03-1';
+import { escapeHtml, buildStudentUrl, formatDateTime, parseCsvText, percent } from './utils.js?v=2026-05-03-1';
 import {
   hasTeacherSession,
   loginTeacher,
@@ -22,7 +22,7 @@ import {
   loadResultsDetailed,
   loadSubmissionDetail,
   resetSubmission
-} from './api.js?v=2026-04-13-6';
+} from './api.js?v=2026-05-03-1';
 
 const loadingApp = document.getElementById('loadingApp');
 const teacherLoginView = document.getElementById('teacherLogin');
