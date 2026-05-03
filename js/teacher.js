@@ -842,6 +842,46 @@ async function handleResetSubmission(submissionId, studentName) {
   }
 }
 
+async function populateTeacherSelectors() {
+  const [classes, tests] = await Promise.all([loadClasses(), loadTests()]);
+  state.tests = tests;
+
+  const classSelect = document.getElementById('classSelect');
+  const testSelect = document.getElementById('testSelect');
+  const importClassSelect = document.getElementById('importClassSelect');
+
+  if (classSelect) {
+    classSelect.innerHTML = classes.length
+      ? classes.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')
+      : '<option value="">Keine Klasse vorhanden</option>';
+  }
+
+  if (importClassSelect) {
+    importClassSelect.innerHTML = classes.length
+      ? classes.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')
+      : '<option value="">Keine Klasse vorhanden</option>';
+  }
+
+  if (testSelect) {
+    testSelect.innerHTML = tests.length
+      ? tests.map(t => `<option value="${t.id}" data-duration="${t.duration_minutes}">${escapeHtml(t.title)}</option>`).join('')
+      : '<option value="">Kein Test vorhanden</option>';
+  }
+
+  if (tests.length && document.getElementById('durationInput')) {
+    document.getElementById('durationInput').value = tests[0].duration_minutes || 15;
+  }
+
+  if (testSelect) {
+    testSelect.onchange = () => {
+      const selected = state.tests.find(t => t.id === testSelect.value);
+      if (selected && document.getElementById('durationInput')) {
+        document.getElementById('durationInput').value = selected.duration_minutes || 15;
+      }
+    };
+  }
+}
+
 async function refreshTeacherAppSections() {
   const thisRun = ++state.renderRun;
   setTeacherStatus('info', 'Daten werden geladen ...');
